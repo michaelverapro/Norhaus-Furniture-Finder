@@ -137,6 +137,9 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
 
   // FORCE RETURN THE LOG SO WE CAN SEE IT
   if (allItems.length === 0) {
+    
+    alert(diagnosticsLog); // <--- PASTE THIS EXACT LINE HERE!
+    
     return { 
       items: [{
         id: "diag-log",
