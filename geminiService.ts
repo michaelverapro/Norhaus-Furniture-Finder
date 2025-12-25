@@ -1,4 +1,4 @@
-// geminiService.ts - Final Robust Looping Version
+// geminiService.ts - "Noisy" Debug Mode (Looping Strategy)
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { SearchResult, FurnitureItem, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
@@ -79,7 +79,7 @@ export const syncAndCacheLibrary = async (folderId: string, accessToken: string)
   return { cacheName, catalogMetadata };
 };
 
-// --- SEARCH (LOOP STRATEGY) ---
+// --- SEARCH (LOOP STRATEGY + DEBUG CARD) ---
 export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   
   // 1. Restore from DB if needed
@@ -93,7 +93,7 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
     }
   }
 
-  // 2. Prepare Image (Sent with every request if present)
+  // 2. Prepare Image
   let imagePart: any = null;
   if (imageFile) {
     const reader = new FileReader();
@@ -105,68 +105,70 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
   }
 
   const allItems: FurnitureItem[] = [];
-  let log = `Searched ${CATALOG_MEMORY_BANK.length} catalogs.\n`;
+  let log = `DEBUG LOG (Model: ${SEARCH_MODEL_NAME})\n`;
+  log += `Catalogs to scan: ${CATALOG_MEMORY_BANK.length}\n`;
 
-  // 3. THE LOOP (Crucial for handling 20MB+ data)
+  // 3. THE LOOP
   for (const catalog of CATALOG_MEMORY_BANK) {
     try {
+      const kbSize = Math.round(catalog.data.length / 1024);
+      log += `\nScanning: ${catalog.name} (${kbSize} KB)... `;
+
       const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
       
       const parts = [
         { inlineData: { data: catalog.data, mimeType: "application/pdf" } },
-        { text: `Search this catalog for: "${query}". Return a JSON object with a property "items" containing the best 1-2 matches. If no close matches, return empty items.` }
+        { text: `Search this catalog for: "${query}". Return a JSON object with a property "items" containing the best 1 match. If NO match, return empty array.` }
       ];
       
       if (imagePart) parts.push(imagePart);
 
       const result = await model.generateContent({
         contents: [{ role: "user", parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: SchemaType.OBJECT,
-            properties: {
-              items: {
-                type: SchemaType.ARRAY,
-                items: {
-                  type: SchemaType.OBJECT,
-                  properties: {
-                    name: { type: SchemaType.STRING },
-                    description: { type: SchemaType.STRING },
-                    pageNumber: { type: SchemaType.INTEGER },
-                    visualSummary: { type: SchemaType.STRING },
-                    category: { type: SchemaType.STRING },
-                    priceEstimate: { type: SchemaType.STRING }
-                  },
-                  required: ["name", "description", "visualSummary"]
-                }
-              }
-            }
-          }
-        }
+        generationConfig: { responseMimeType: "application/json" }
       });
 
-      // CLEANUP: Strip Markdown formatting
       const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+      log += `[Response: ${text.substring(0, 50)}...]`; // Log the first 50 chars of response
+      
       const data = JSON.parse(text);
 
       if (data.items && Array.isArray(data.items) && data.items.length > 0) {
         const taggedItems = data.items.map((item: any) => ({
           ...item,
           id: Math.random().toString(36).substr(2, 9),
-          catalogName: catalog.name, // Tag the source!
+          catalogName: catalog.name, 
           catalogId: catalog.id,
           category: item.category || "Furniture",
           priceEstimate: "Contact Dealer"
         }));
         allItems.push(...taggedItems);
+        log += " [MATCH FOUND]";
+      } else {
+        log += " [NO MATCHES]";
       }
 
     } catch (e: any) {
       console.error(`Error scanning ${catalog.name}:`, e);
-      // If one PDF fails (e.g. too big), we just log it and move to the next one
-      log += `Skipped ${catalog.name} (Error: ${e.message})\n`;
+      log += ` [ERROR: ${e.message}]`;
     }
+  }
+
+  // 4. FALLBACK: IF NO ITEMS, SHOW THE LOG AS A CARD
+  if (allItems.length === 0) {
+    return { 
+      items: [{
+        id: "debug-log",
+        name: "Search Complete - No Matches",
+        description: log, // <--- THIS WILL SHOW THE LOG IN THE UI
+        pageNumber: 0,
+        catalogName: "System Log",
+        catalogId: "0",
+        category: "System",
+        visualSummary: "See description for details."
+      }],
+      thinkingProcess: log 
+    };
   }
 
   return { items: allItems, thinkingProcess: log };
