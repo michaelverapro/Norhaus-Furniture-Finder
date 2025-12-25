@@ -1,9 +1,8 @@
-// geminiService.ts - Cloud Version
-import { SearchResult } from "../types";
+// geminiService.ts - Fixed Import Path
+import { SearchResult } from "./types"; // <--- CHANGED from "../types" to "./types"
 
 export const syncAndCacheLibrary = async () => {
   // In the Cloud version, "Sync" just means confirming the server is reachable.
-  // We no longer download files to the browser.
   return { cacheName: "cloud-mode", catalogMetadata: [] };
 };
 
@@ -34,4 +33,3 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
     };
   }
 };
-
