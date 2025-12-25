@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Catalog, FurnitureItem, SearchMode, SyncStatus } from './types';
-import { searchFurniture, syncAndCacheLibrary } from './services/geminiService';
+import { searchFurniture, syncAndCacheLibrary } from './geminiService';
 import * as pdfjs from 'pdfjs-dist';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs`;
