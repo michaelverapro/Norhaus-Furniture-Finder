@@ -1,4 +1,4 @@
-// geminiService.ts - "Noisy" Debug Mode (Looping Strategy)
+// geminiService.ts - Debug Pop-up Mode
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { SearchResult, FurnitureItem, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
@@ -79,10 +79,10 @@ export const syncAndCacheLibrary = async (folderId: string, accessToken: string)
   return { cacheName, catalogMetadata };
 };
 
-// --- SEARCH (LOOP STRATEGY + DEBUG CARD) ---
+// --- SEARCH WITH POP-UP LOG ---
 export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   
-  // 1. Restore from DB if needed
+  // 1. Restore from DB
   if (CATALOG_MEMORY_BANK.length === 0) {
     try {
       const stored = await loadFromDB();
@@ -105,22 +105,28 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
   }
 
   const allItems: FurnitureItem[] = [];
-  let log = `DEBUG LOG (Model: ${SEARCH_MODEL_NAME})\n`;
-  log += `Catalogs to scan: ${CATALOG_MEMORY_BANK.length}\n`;
+  let log = `DEBUG REPORT (${new Date().toLocaleTimeString()}):\n`;
+  let processedCount = 0;
 
   // 3. THE LOOP
   for (const catalog of CATALOG_MEMORY_BANK) {
     try {
+      // SIZE CHECK: 12MB Limit (12,000 KB)
       const kbSize = Math.round(catalog.data.length / 1024);
-      log += `\nScanning: ${catalog.name} (${kbSize} KB)... `;
+      log += `\n📄 ${catalog.name} (${kbSize} KB): `;
 
+      if (kbSize > 12000) {
+        log += "SKIP (Too Large)";
+        continue; 
+      }
+
+      processedCount++;
       const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
       
       const parts = [
         { inlineData: { data: catalog.data, mimeType: "application/pdf" } },
         { text: `Search this catalog for: "${query}". Return a JSON object with a property "items" containing the best 1 match. If NO match, return empty array.` }
       ];
-      
       if (imagePart) parts.push(imagePart);
 
       const result = await model.generateContent({
@@ -129,8 +135,6 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
       });
 
       const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-      log += `[Response: ${text.substring(0, 50)}...]`; // Log the first 50 chars of response
-      
       const data = JSON.parse(text);
 
       if (data.items && Array.isArray(data.items) && data.items.length > 0) {
@@ -143,32 +147,43 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
           priceEstimate: "Contact Dealer"
         }));
         allItems.push(...taggedItems);
-        log += " [MATCH FOUND]";
+        log += "MATCH ✅";
       } else {
-        log += " [NO MATCHES]";
+        log += "No match ❌";
       }
 
     } catch (e: any) {
       console.error(`Error scanning ${catalog.name}:`, e);
-      log += ` [ERROR: ${e.message}]`;
+      log += `ERROR: ${e.message}`;
     }
   }
 
-  // 4. FALLBACK: IF NO ITEMS, SHOW THE LOG AS A CARD
+  // 4. TRIGGER POP-UP MODAL IF EMPTY
   if (allItems.length === 0) {
+    
+    // This triggers the native browser pop-up
+    setTimeout(() => {
+        alert(log); 
+    }, 500); // Slight delay to ensure UI renders first
+
     return { 
       items: [{
         id: "debug-log",
-        name: "Search Complete - No Matches",
-        description: log, // <--- THIS WILL SHOW THE LOG IN THE UI
+        name: "Debug Pop-up Triggered",
+        description: "Please check the system pop-up window for the full log.",
         pageNumber: 0,
-        catalogName: "System Log",
+        catalogName: "System",
         catalogId: "0",
         category: "System",
-        visualSummary: "See description for details."
+        visualSummary: "Log details in pop-up."
       }],
       thinkingProcess: log 
     };
+  }
+
+  return { items: allItems, thinkingProcess: log };
+};
+
   }
 
   return { items: allItems, thinkingProcess: log };
