@@ -9,12 +9,21 @@ const SearchIcon = () => (
 const PaperclipIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
 );
-const XCircleIcon = () => (
-  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
-);
 const CloseIcon = () => (
   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" /></svg>
 );
+const ExternalLinkIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+);
+const XCircleIcon = () => (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+  );
+
+// Helper to make filenames look nice (removes .pdf and underscores)
+const formatCatalogName = (filename: string) => {
+    if (!filename) return "Unknown Catalog";
+    return filename.replace('.pdf', '').replace(/_/g, ' ').replace(/-/g, ' ');
+};
 
 // --- The PDF Viewer Modal ---
 const PDFViewerModal: React.FC<{ item: FurnitureItem | null, onClose: () => void }> = ({ item, onClose }) => {
@@ -22,62 +31,73 @@ const PDFViewerModal: React.FC<{ item: FurnitureItem | null, onClose: () => void
 
   const cleanName = encodeURIComponent(item.catalogName);
   let url = `https://storage.googleapis.com/norhaus_catalogues/${cleanName}`;
-  
-  // The backend now ensures this is just a number like "8"
   const pageNum = item.pageNumber;
-  if (pageNum) {
-    url += `#page=${pageNum}`;
-  }
+  const deepLinkUrl = pageNum ? `${url}#page=${pageNum}` : url;
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col animate-in fade-in duration-200">
-      <div className="flex items-center justify-between px-8 py-4 bg-black/50 border-b border-white/10 text-white">
-        <div>
-          <h3 className="text-lg font-serif">{item.name}</h3>
-          {/* Visual confirmation of where it's trying to go */}
-          <p className="text-xs text-gray-400 uppercase tracking-widest">
-            {item.catalogName} • {pageNum ? `Jumping to Page ${pageNum}` : 'Opening Cover Page'}
+      <div className="flex items-center justify-between px-6 py-4 bg-[#1a1a1a] border-b border-white/10 text-white shadow-lg">
+        <div className="flex flex-col">
+          <h3 className="text-lg font-serif tracking-wide text-white">{item.name}</h3>
+          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">
+             {formatCatalogName(item.catalogName)} <span className="text-white/30 mx-2">|</span> Page {pageNum || '1'}
           </p>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-          <CloseIcon />
-        </button>
+        
+        <div className="flex items-center gap-4">
+            <a 
+              href={deepLinkUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              className="flex items-center gap-2 bg-[#434738] hover:bg-[#535845] text-white px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              <span>Open Page {pageNum}</span>
+              <ExternalLinkIcon />
+            </a>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white">
+              <CloseIcon />
+            </button>
+        </div>
       </div>
-
       <div className="flex-1 w-full bg-[#333] relative">
-         <iframe 
-           src={url} 
-           className="w-full h-full border-none" 
-           title="PDF Viewer"
-         />
+         <iframe src={deepLinkUrl} className="w-full h-full border-none" title="PDF Viewer" />
       </div>
     </div>
   );
 };
 
+// --- The Result Card ---
 const ItemCard: React.FC<{ item: FurnitureItem, onClick: () => void }> = ({ item, onClick }) => {
   return (
     <div 
       onClick={onClick}
-      className="luxury-card rounded-sm overflow-hidden flex flex-col h-full group animate-fade-up cursor-pointer hover:shadow-2xl transition-all duration-500"
+      className="luxury-card rounded-sm overflow-hidden flex flex-col h-full group animate-fade-up cursor-pointer hover:shadow-2xl transition-all duration-500 bg-white"
     >
-      {/* This section is now clearly a placeholder for the click action */}
+      {/* 1. Visual Area (Click Action) */}
       <div className="h-64 relative overflow-hidden bg-[#f0ede6] flex items-center justify-center p-8 group-hover:bg-[#e8e5de] transition-colors">
-        <div className="absolute top-4 left-4 z-10 text-[9px] font-bold uppercase tracking-[0.2em] text-[#434738]/40">
-          Click to View PDF
-        </div>
         <div className="text-center opacity-30 group-hover:opacity-50 transition-opacity transform group-hover:scale-110 duration-500">
             <svg className="w-20 h-20 text-[#434738]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
         </div>
+        
+        {/* 4. Page Number (Badge) */}
         <div className="absolute bottom-4 right-4 text-[9px] font-bold text-[#434738] uppercase tracking-widest border border-[#434738]/20 px-2 py-1 bg-white/50">
-          Found on Page {item.pageNumber || 'N/A'}
+          Page {item.pageNumber || '?'}
         </div>
       </div>
 
-      <div className="p-6 flex flex-col flex-1 text-center bg-white">
-        <p className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-[0.3em] mb-2 truncate">{item.catalogName}</p>
-        <h3 className="text-xl font-normal text-[#3a3d31] mb-3 leading-tight line-clamp-2">{item.name}</h3>
-        <p className="text-xs text-[#7c766d] leading-relaxed mb-6 flex-1 line-clamp-3 italic serif">
+      <div className="p-6 flex flex-col flex-1 text-left bg-white">
+        {/* 3. Catalog Name (Top Label) */}
+        <p className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-[0.3em] mb-3 truncate border-b border-[#f0ede6] pb-2">
+            {formatCatalogName(item.catalogName)}
+        </p>
+
+        {/* 1. Name of Furniture */}
+        <h3 className="text-xl font-normal text-[#3a3d31] mb-3 leading-tight line-clamp-2">
+            {item.name}
+        </h3>
+
+        {/* 2. AI Description */}
+        <p className="text-xs text-[#7c766d] leading-relaxed mb-4 flex-1 line-clamp-4 italic serif">
           "{item.description}"
         </p>
       </div>
@@ -129,7 +149,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-6">
              <div className="text-[10px] font-bold uppercase tracking-widest text-[#b0a99f]">
-                Status: Online
+                Status: Pro Active
              </div>
              <div className="w-2 h-2 rounded-full bg-[#434738] shadow-[0_0_8px_rgba(67,71,56,0.5)]"></div>
           </div>
@@ -183,7 +203,6 @@ const App: React.FC = () => {
                 }}
               />
             </div>
-            
             {previewUrl && (
               <div className="absolute -bottom-20 left-0 flex items-center gap-4 bg-white border border-[#e8e4dc] p-2 pr-6 rounded-sm shadow-xl animate-fade-up z-20">
                   <img src={previewUrl} className="w-12 h-12 object-cover rounded-sm" />
@@ -202,7 +221,7 @@ const App: React.FC = () => {
           {isSearching ? (
              <div className="flex flex-col items-center justify-center py-24 opacity-60">
                 <div className="w-10 h-10 border-b-2 border-[#434738] rounded-full animate-spin mb-6" />
-                <p className="text-xs uppercase tracking-[0.2em] text-[#b0a99f]">Scanning Catalogs...</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-[#b0a99f]">Analyzing Archives...</p>
              </div>
           ) : results.length > 0 ? (
             <div className="max-w-[1600px] mx-auto">
