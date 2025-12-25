@@ -1,9 +1,8 @@
-// api/search.js
 import { Storage } from '@google-cloud/storage';
-import { VertexAI } from '@google-cloud/vertexai';
+import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 60, // Vercel limit
 };
 
 export default async function handler(req, res) {
@@ -18,60 +17,64 @@ export default async function handler(req, res) {
 
     const vertexAI = new VertexAI({ project: projectId, location: 'us-central1', googleAuthOptions: { credentials } });
     
-    // UPDATE: Changed from 'gemini-1.5-flash' to 'gemini-2.5-flash'
-    const model = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // Use the new Flash model
+    const model = vertexAI.getGenerativeModel({ 
+        model: 'gemini-2.5-flash',
+        generationConfig: { responseMimeType: "application/json" }, // <--- FORCE JSON
+        safetySettings: [{ category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }]
+    });
 
     const { query } = req.body;
-    console.log(`Searching for "${query}" in bucket: ${bucketName}`);
-
+    
+    // 1. List Files
     const [files] = await storage.bucket(bucketName).getFiles();
     const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
 
-    if (pdfs.length === 0) return res.status(200).json({ items: [], log: "Bucket is empty or has no PDFs." });
+    if (pdfs.length === 0) return res.status(200).json({ items: [], log: "Bucket is empty." });
 
-    const allItems = [];
-    let log = `Scanned ${pdfs.length} catalogs in cloud.\n`;
-
-    for (const file of pdfs) {
-        const gcsUri = `gs://${bucketName}/${file.name}`;
-        
-        const request = {
-            contents: [{
-                role: 'user',
-                parts: [
-                    { fileData: { fileUri: gcsUri, mimeType: 'application/pdf' } },
-                    { text: `Search this catalog for "${query}". Return a JSON object with a property "items" containing the best 1 match. If NO match, return empty items.` }
-                ]
-            }]
-        };
-
+    // 2. Scan in Parallel (Limit to 5 at a time to be safe, or all if small)
+    // We will race them to get results faster.
+    const searchPromises = pdfs.map(async (file) => {
         try {
-            const result = await model.generateContent(request);
+            const result = await model.generateContent({
+                contents: [{
+                    role: 'user',
+                    parts: [
+                        { fileData: { fileUri: `gs://${bucketName}/${file.name}`, mimeType: 'application/pdf' } },
+                        { text: `Search this catalog for "${query}". Return a JSON object with a key "items" containing a list of matches. Each match must have "name", "description", "pageNumber". If no match, return {"items": []}.` }
+                    ]
+                }]
+            });
+            
             const response = await result.response;
-            const text = response.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
-            const data = JSON.parse(text);
-
-            if (data.items && data.items.length > 0) {
-                allItems.push(...data.items.map(item => ({
-                    ...item,
-                    catalogName: file.name,
-                    id: Math.random().toString(36).substr(2, 9)
-                })));
-                log += `✅ Match in ${file.name}\n`;
-            } else {
-                log += `⚪ No match in ${file.name}\n`;
-            }
-        } catch (err) {
-            console.error(err);
-            log += `❌ Error scanning ${file.name}: ${err.message}\n`;
+            // The AI is now forced to return JSON, so we can parse directly
+            return JSON.parse(response.candidates[0].content.parts[0].text);
+        } catch (e) {
+            console.error(`Error scanning ${file.name}:`, e.message);
+            return { items: [] }; // Return empty on error so we don't crash
         }
-    }
+    });
 
-    res.status(200).json({ items: allItems, thinkingProcess: log });
+    // 3. Wait for all scans to finish
+    const results = await Promise.all(searchPromises);
+
+    // 4. Combine results
+    const allItems = [];
+    results.forEach((res, index) => {
+        if (res.items && res.items.length > 0) {
+            res.items.forEach(item => {
+                allItems.push({ ...item, catalogName: pdfs[index].name });
+            });
+        }
+    });
+
+    res.status(200).json({ 
+        items: allItems, 
+        thinkingProcess: `Scanned ${pdfs.length} catalogs in parallel. Found ${allItems.length} matches.` 
+    });
 
   } catch (error) {
     console.error("Server Error:", error);
     res.status(500).json({ error: error.message });
   }
 }
-
