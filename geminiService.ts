@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { SearchResult, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 const CACHE_KEY_STORAGE = 'norhaus_cache_token';
 // Upgrading to Pro for superior reasoning over complex document caches
