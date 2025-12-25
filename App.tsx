@@ -20,33 +20,30 @@ const CloseIcon = () => (
 const PDFViewerModal: React.FC<{ item: FurnitureItem | null, onClose: () => void }> = ({ item, onClose }) => {
   if (!item) return null;
 
-  // 1. Construct the Public URL
-  // NOTE: This requires the bucket to be set to "Public Access" -> "Storage Object Viewer" for "allUsers"
   const cleanName = encodeURIComponent(item.catalogName);
   let url = `https://storage.googleapis.com/norhaus_catalogues/${cleanName}`;
-
-  // 2. Add Page Anchor
-  // This tells Chrome/Edge/Safari to jump directly to the page
-  // We strip non-digits (so "Page Y-8" becomes "8")
-  const pageNum = item.pageNumber ? item.pageNumber.toString().replace(/\D/g, '') : '';
+  
+  // The backend now ensures this is just a number like "8"
+  const pageNum = item.pageNumber;
   if (pageNum) {
     url += `#page=${pageNum}`;
   }
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col animate-in fade-in duration-200">
-      {/* Viewer Header */}
       <div className="flex items-center justify-between px-8 py-4 bg-black/50 border-b border-white/10 text-white">
         <div>
           <h3 className="text-lg font-serif">{item.name}</h3>
-          <p className="text-xs text-gray-400 uppercase tracking-widest">{item.catalogName} • Page {pageNum || '1'}</p>
+          {/* Visual confirmation of where it's trying to go */}
+          <p className="text-xs text-gray-400 uppercase tracking-widest">
+            {item.catalogName} • {pageNum ? `Jumping to Page ${pageNum}` : 'Opening Cover Page'}
+          </p>
         </div>
         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
           <CloseIcon />
         </button>
       </div>
 
-      {/* The PDF Frame */}
       <div className="flex-1 w-full bg-[#333] relative">
          <iframe 
            src={url} 
@@ -64,16 +61,16 @@ const ItemCard: React.FC<{ item: FurnitureItem, onClick: () => void }> = ({ item
       onClick={onClick}
       className="luxury-card rounded-sm overflow-hidden flex flex-col h-full group animate-fade-up cursor-pointer hover:shadow-2xl transition-all duration-500"
     >
+      {/* This section is now clearly a placeholder for the click action */}
       <div className="h-64 relative overflow-hidden bg-[#f0ede6] flex items-center justify-center p-8 group-hover:bg-[#e8e5de] transition-colors">
         <div className="absolute top-4 left-4 z-10 text-[9px] font-bold uppercase tracking-[0.2em] text-[#434738]/40">
-          PDF Asset
+          Click to View PDF
         </div>
         <div className="text-center opacity-30 group-hover:opacity-50 transition-opacity transform group-hover:scale-110 duration-500">
-            {/* Elegant Document Icon */}
             <svg className="w-20 h-20 text-[#434738]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
         </div>
         <div className="absolute bottom-4 right-4 text-[9px] font-bold text-[#434738] uppercase tracking-widest border border-[#434738]/20 px-2 py-1 bg-white/50">
-          Page {item.pageNumber || '?'}
+          Found on Page {item.pageNumber || 'N/A'}
         </div>
       </div>
 
@@ -83,10 +80,6 @@ const ItemCard: React.FC<{ item: FurnitureItem, onClick: () => void }> = ({ item
         <p className="text-xs text-[#7c766d] leading-relaxed mb-6 flex-1 line-clamp-3 italic serif">
           "{item.description}"
         </p>
-
-        <button className="w-full py-3 border border-[#434738]/20 text-[#434738] uppercase text-[9px] tracking-[0.2em] font-bold hover:bg-[#434738] hover:text-white transition-all">
-          View in Catalog
-        </button>
       </div>
     </div>
   );
@@ -99,10 +92,7 @@ const App: React.FC = () => {
   const [thinkingLog, setThinkingLog] = useState('');
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  
-  // New State for Viewer
   const [selectedItem, setSelectedItem] = useState<FurnitureItem | null>(null);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSearch = async () => {
@@ -125,12 +115,10 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#faf9f6]">
-      {/* PDF Viewer Overlay */}
       {selectedItem && (
         <PDFViewerModal item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
 
-      {/* Header */}
       <nav className="glass-nav sticky top-0 z-40 px-12 py-6 border-b border-[#e8e4dc] bg-white/80 backdrop-blur-md">
         <div className="max-w-[1800px] mx-auto flex justify-between items-center">
           <div className="flex items-center gap-16">
