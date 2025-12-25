@@ -1,32 +1,29 @@
 // api/search.js
-// This runs securely on Vercel's servers, not in the user's browser.
 import { Storage } from '@google-cloud/storage';
 import { VertexAI } from '@google-cloud/vertexai';
 
 export const config = {
-  maxDuration: 60, // Allow search to run for up to 60 seconds
+  maxDuration: 60,
 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
   try {
-    // 1. Authenticate using the Key from Vercel Settings
     const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
     const projectId = credentials.project_id;
     
-    // 2. Connect to the Bucket
     const storage = new Storage({ projectId, credentials });
-    const bucketName = 'norhaus_catalogues'; // ✅ YOUR BUCKET NAME
+    const bucketName = 'norhaus_catalogues'; 
 
-    // 3. Connect to the AI
     const vertexAI = new VertexAI({ project: projectId, location: 'us-central1', googleAuthOptions: { credentials } });
-    const model = vertexAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    // UPDATE: Changed from 'gemini-1.5-flash' to 'gemini-2.5-flash'
+    const model = vertexAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const { query } = req.body;
     console.log(`Searching for "${query}" in bucket: ${bucketName}`);
 
-    // 4. Get List of PDFs
     const [files] = await storage.bucket(bucketName).getFiles();
     const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
 
@@ -35,11 +32,9 @@ export default async function handler(req, res) {
     const allItems = [];
     let log = `Scanned ${pdfs.length} catalogs in cloud.\n`;
 
-    // 5. Scan Each PDF (Server-Side)
     for (const file of pdfs) {
         const gcsUri = `gs://${bucketName}/${file.name}`;
         
-        // This is the magic: We send the LINK (gs://), not the file data.
         const request = {
             contents: [{
                 role: 'user',
@@ -68,7 +63,7 @@ export default async function handler(req, res) {
             }
         } catch (err) {
             console.error(err);
-            log += `❌ Error scanning ${file.name}\n`;
+            log += `❌ Error scanning ${file.name}: ${err.message}\n`;
         }
     }
 
@@ -79,3 +74,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
