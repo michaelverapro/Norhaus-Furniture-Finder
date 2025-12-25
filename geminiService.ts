@@ -1,4 +1,4 @@
-// geminiService.ts - Debug Pop-up Mode
+// geminiService.ts - Status Summary Mode
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { SearchResult, FurnitureItem, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
@@ -79,7 +79,7 @@ export const syncAndCacheLibrary = async (folderId: string, accessToken: string)
   return { cacheName, catalogMetadata };
 };
 
-// --- SEARCH WITH POP-UP LOG ---
+// --- SEARCH WITH CLEAN STATUS REPORT ---
 export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   
   // 1. Restore from DB
@@ -105,22 +105,21 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
   }
 
   const allItems: FurnitureItem[] = [];
-  let log = `DEBUG REPORT (${new Date().toLocaleTimeString()}):\n`;
-  let processedCount = 0;
+  
+  // WE WILL BUILD A CLEAN LIST OF RESULTS HERE
+  let statusReport: string[] = []; 
 
   // 3. THE LOOP
   for (const catalog of CATALOG_MEMORY_BANK) {
     try {
-      // SIZE CHECK: 12MB Limit (12,000 KB)
+      // SIZE CHECK: 12MB Limit
       const kbSize = Math.round(catalog.data.length / 1024);
-      log += `\n📄 ${catalog.name} (${kbSize} KB): `;
-
+      
       if (kbSize > 12000) {
-        log += "SKIP (Too Large)";
+        statusReport.push(`⚠️ ${catalog.name.substring(0, 15)}...: SKIPPED (${Math.round(kbSize/1024)}MB is too large)`);
         continue; 
       }
 
-      processedCount++;
       const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
       
       const parts = [
@@ -147,44 +146,35 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
           priceEstimate: "Contact Dealer"
         }));
         allItems.push(...taggedItems);
-        log += "MATCH ✅";
+        statusReport.push(`✅ ${catalog.name.substring(0, 15)}...: MATCH FOUND`);
       } else {
-        log += "No match ❌";
+        statusReport.push(`⚪ ${catalog.name.substring(0, 15)}...: No matches`);
       }
 
     } catch (e: any) {
       console.error(`Error scanning ${catalog.name}:`, e);
-      log += `ERROR: ${e.message}`;
+      statusReport.push(`❌ ${catalog.name.substring(0, 15)}...: ERROR (${e.message.includes('403') ? 'Permission' : 'API'})`);
     }
   }
 
-  // 4. TRIGGER POP-UP MODAL IF EMPTY
-  if (allItems.length === 0) {
-    
-    // This triggers the native browser pop-up
-    setTimeout(() => {
-        alert(log); 
-    }, 500); // Slight delay to ensure UI renders first
+  const finalLog = statusReport.join("\n");
 
+  // 4. FALLBACK: IF NO MATCHES, SHOW THE REPORT CARD
+  if (allItems.length === 0) {
     return { 
       items: [{
-        id: "debug-log",
-        name: "Debug Pop-up Triggered",
-        description: "Please check the system pop-up window for the full log.",
+        id: "status-report",
+        name: "Search Status Report",
+        description: finalLog, // <--- THIS WILL NOW LIST EVERY FILE'S FATE
         pageNumber: 0,
         catalogName: "System",
         catalogId: "0",
         category: "System",
-        visualSummary: "Log details in pop-up."
+        visualSummary: "See list above for details."
       }],
-      thinkingProcess: log 
+      thinkingProcess: finalLog 
     };
   }
 
-  return { items: allItems, thinkingProcess: log };
-};
-
-  }
-
-  return { items: allItems, thinkingProcess: log };
+  return { items: allItems, thinkingProcess: finalLog };
 };
