@@ -2,7 +2,7 @@ import { Storage } from '@google-cloud/storage';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 
 export const config = {
-  maxDuration: 60, // Vercel limit
+  maxDuration: 60,
 };
 
 export default async function handler(req, res) {
@@ -17,11 +17,17 @@ export default async function handler(req, res) {
 
     const vertexAI = new VertexAI({ project: projectId, location: 'us-central1', googleAuthOptions: { credentials } });
     
-    // Use the new Flash model
+    // Safety: Turn off all filters so it doesn't "refuse" to look at furniture
+    const safetySettings = [
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE }
+    ];
+
     const model = vertexAI.getGenerativeModel({ 
         model: 'gemini-2.5-flash',
-        generationConfig: { responseMimeType: "application/json" }, // <--- FORCE JSON
-        safetySettings: [{ category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }]
+        safetySettings: safetySettings
     });
 
     const { query } = req.body;
@@ -32,8 +38,7 @@ export default async function handler(req, res) {
 
     if (pdfs.length === 0) return res.status(200).json({ items: [], log: "Bucket is empty." });
 
-    // 2. Scan in Parallel (Limit to 5 at a time to be safe, or all if small)
-    // We will race them to get results faster.
+    // 2. Scan in Parallel
     const searchPromises = pdfs.map(async (file) => {
         try {
             const result = await model.generateContent({
@@ -41,27 +46,39 @@ export default async function handler(req, res) {
                     role: 'user',
                     parts: [
                         { fileData: { fileUri: `gs://${bucketName}/${file.name}`, mimeType: 'application/pdf' } },
-                        { text: `Search this catalog for "${query}". Return a JSON object with a key "items" containing a list of matches. Each match must have "name", "description", "pageNumber". If no match, return {"items": []}.` }
+                        { text: `STRICT INSTRUCTION: You are a search engine. Search this document for "${query}".
+                        
+                        Rules:
+                        1. Output ONLY valid JSON.
+                        2. Do NOT speak. Do NOT say "I'm sorry" or "I have reviewed".
+                        3. If matches are found, return: { "items": [{ "name": "...", "description": "...", "pageNumber": "..." }] }
+                        4. If NO matches are found, return: { "items": [] }` }
                     ]
                 }]
             });
             
             const response = await result.response;
-            // The AI is now forced to return JSON, so we can parse directly
-            return JSON.parse(response.candidates[0].content.parts[0].text);
+            let text = response.candidates[0].content.parts[0].text;
+
+            // --- THE FIX: CLEAN THE RESPONSE ---
+            // Remove markdown wrappers (```json ... ```)
+            text = text.replace(/```json/g, '').replace(/```/g, '');
+            // Trim whitespace
+            text = text.trim();
+
+            return JSON.parse(text);
+
         } catch (e) {
             console.error(`Error scanning ${file.name}:`, e.message);
-            return { items: [] }; // Return empty on error so we don't crash
+            return { items: [] }; 
         }
     });
 
-    // 3. Wait for all scans to finish
     const results = await Promise.all(searchPromises);
 
-    // 4. Combine results
     const allItems = [];
     results.forEach((res, index) => {
-        if (res.items && res.items.length > 0) {
+        if (res && res.items && Array.isArray(res.items)) {
             res.items.forEach(item => {
                 allItems.push({ ...item, catalogName: pdfs[index].name });
             });
@@ -70,7 +87,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ 
         items: allItems, 
-        thinkingProcess: `Scanned ${pdfs.length} catalogs in parallel. Found ${allItems.length} matches.` 
+        thinkingProcess: `Scanned ${pdfs.length} catalogs. Found ${allItems.length} results.` 
     });
 
   } catch (error) {
