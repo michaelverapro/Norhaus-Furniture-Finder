@@ -1,18 +1,21 @@
-// geminiService.ts - With IndexedDB Persistence
+// geminiService.ts - Robust JSON Handling
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { SearchResult, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-const SEARCH_MODEL_NAME = "gemini-1.5-pro-latest"; 
+
+// SWITCH TO FLASH: It is faster and more reliable for "Live" demos on iPad
+const SEARCH_MODEL_NAME = "gemini-1.5-flash-latest"; 
+
 const CACHE_KEY_STORAGE = 'norhaus_cache_token';
 const DB_NAME = 'NorhausDB';
 const STORE_NAME = 'files';
 
-// --- IN-MEMORY CACHE (Fast Access) ---
+// --- IN-MEMORY CACHE ---
 let CATALOG_MEMORY_BANK: { mimeType: string; data: string }[] = [];
 
-// --- DATABASE HELPERS (IndexedDB) ---
+// --- DATABASE HELPERS ---
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
@@ -43,7 +46,6 @@ const loadFromDB = async (): Promise<{ mimeType: string; data: string }[]> => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const request = tx.objectStore(STORE_NAME).getAll();
     request.onsuccess = () => {
-      // Map back to just the data format the AI needs
       const files = request.result.map((f: any) => ({
         mimeType: f.mimeType,
         data: f.data
@@ -66,10 +68,7 @@ export const syncAndCacheLibrary = async (
   if (driveFiles.length === 0) throw new Error("No PDFs found in Drive.");
 
   const catalogMetadata: Catalog[] = [];
-  CATALOG_MEMORY_BANK = []; // Clear RAM
-
-  // Clear DB (Optional: simpler to just overwrite/add for now)
-  // For a cleaner sync, you might want to clearObjectStore here, but let's append.
+  CATALOG_MEMORY_BANK = []; 
 
   for (const file of driveFiles) {
     console.log(`Downloading: ${file.name}`);
@@ -81,13 +80,9 @@ export const syncAndCacheLibrary = async (
       data: base64Data
     };
 
-    // 1. Save to RAM
     CATALOG_MEMORY_BANK.push({ mimeType: fileEntry.mimeType, data: fileEntry.data });
-    
-    // 2. Save to Database (Persistent)
     await saveToDB(fileEntry);
 
-    // 3. Save Metadata
     catalogMetadata.push({
       id: file.id,
       name: file.name,
@@ -96,7 +91,6 @@ export const syncAndCacheLibrary = async (
     });
   }
 
-  // Save the "Index" to LocalStorage
   const simulatedCacheName = `persistent-bank-${Date.now()}`;
   localStorage.setItem(CACHE_KEY_STORAGE, JSON.stringify({
     name: simulatedCacheName,
@@ -115,18 +109,15 @@ export const searchFurniture = async (
   
   // 1. CHECK MEMORY BANK
   if (CATALOG_MEMORY_BANK.length === 0) {
-    console.log("RAM empty. Checking Database...");
     try {
       const storedFiles = await loadFromDB();
       if (storedFiles.length > 0) {
-        console.log(`Restored ${storedFiles.length} catalogs from Database.`);
         CATALOG_MEMORY_BANK = storedFiles;
       } else {
-        return { items: [], thinkingProcess: "Local database is empty. Please Sync Library." };
+        return { items: [], thinkingProcess: "Database empty. Please Sync." };
       }
     } catch (e) {
-      console.error("DB Load Error:", e);
-      return { items: [], thinkingProcess: "Database error. Please refresh or re-sync." };
+      return { items: [], thinkingProcess: "Database Error." };
     }
   }
 
@@ -134,19 +125,17 @@ export const searchFurniture = async (
   const model = genAI.getGenerativeModel({
     model: SEARCH_MODEL_NAME,
     systemInstruction: `You are the Norhaus Engine.
-      1. SEARCH GOAL: Find luxury furniture matching the user's query in the attached PDFs.
-      2. VISUALS: If an image is provided, match its style/shape primarily.
+      1. SEARCH GOAL: Find furniture items matching the user's query in the attached PDFs.
+      2. VISUALS: If an image is provided, match its style.
       3. OUTPUT: Return strictly valid JSON.`
   });
 
   const parts: any[] = [];
 
-  // Inject Catalogs
   CATALOG_MEMORY_BANK.forEach(file => {
     parts.push({ inlineData: file });
   });
 
-  // Inject User Image
   if (imageFile) {
     const reader = new FileReader();
     const base64Image = await new Promise<string>((resolve) => {
@@ -194,12 +183,18 @@ export const searchFurniture = async (
       }
     });
 
-    const text = result.response.text();
+    let text = result.response.text();
+    
+    // --- THE FIX: CLEAN MARKDOWN ---
+    // Gemini often wraps JSON in ```json ... ```. We must strip this.
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
     const data = JSON.parse(text) as SearchResult;
     return { ...data, isCached: true };
 
-  } catch (e) {
+  } catch (e: any) {
     console.error("Norhaus Engine Error:", e);
-    return { items: [], thinkingProcess: "Error generating response." };
+    // Return the ACTUAL error so we can see it in the UI
+    return { items: [], thinkingProcess: `Engine Error: ${e.message}` };
   }
 };
