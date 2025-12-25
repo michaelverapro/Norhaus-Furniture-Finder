@@ -1,4 +1,4 @@
-// geminiService.ts - Final Production Version
+// geminiService.ts - Final "All-At-Once" Version
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { SearchResult, FurnitureItem, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
@@ -6,14 +6,14 @@ import { downloadDriveFile, listFolderContents } from "./driveService";
 // Initialize the API
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// FIX 1: Use the STABLE model name (removes the 404 error)
+// ✅ CORRECT MODEL NAME (Stable)
 const SEARCH_MODEL_NAME = "gemini-1.5-flash"; 
 
 const CACHE_KEY_STORAGE = 'norhaus_cache_token';
 const DB_NAME = 'NorhausDB';
 const STORE_NAME = 'files';
 
-// --- DATABASE LOGIC (Keeps files saved on refresh) ---
+// --- DATABASE LOGIC (IndexedDB) ---
 let CATALOG_MEMORY_BANK: { id: string; name: string; mimeType: string; data: string }[] = [];
 
 const openDB = (): Promise<IDBDatabase> => {
@@ -91,10 +91,10 @@ export const syncAndCacheLibrary = async (folderId: string, accessToken: string)
   return { cacheName, catalogMetadata };
 };
 
-// --- SEARCH FUNCTION ---
+// --- SEARCH FUNCTION (ALL AT ONCE) ---
 export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   
-  // 1. Restore from Database if RAM is empty (e.g. after refresh)
+  // 1. Restore from Database if RAM is empty
   if (CATALOG_MEMORY_BANK.length === 0) {
     try {
       const stored = await loadFromDB();
@@ -108,79 +108,101 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
     }
   }
 
-  // 2. Prepare Image (Processed once, sent to all catalogs)
-  let imagePart: any = null;
+  // 2. Prepare the Massive Payload
+  // We will construct one single message containing ALL catalogs + the user query.
+  const parts: any[] = [];
+  
+  // A. Inject ALL Catalogs
+  CATALOG_MEMORY_BANK.forEach(file => {
+    parts.push({ 
+      inlineData: { 
+        data: file.data, 
+        mimeType: "application/pdf" 
+      } 
+    });
+  });
+
+  // B. Inject User Image (if any)
   if (imageFile) {
     const reader = new FileReader();
     const base64 = await new Promise<string>(r => {
       reader.onload = () => r((reader.result as string).split(',')[1]);
       reader.readAsDataURL(imageFile);
     });
-    imagePart = { inlineData: { data: base64, mimeType: imageFile.type } };
+    parts.push({ 
+      inlineData: { 
+        data: base64, 
+        mimeType: imageFile.type 
+      } 
+    });
   }
 
-  const allItems: FurnitureItem[] = [];
-  let log = `Searched ${CATALOG_MEMORY_BANK.length} catalogs for "${query}".\n`;
-
-  // 3. Loop through catalogs (FIX: Prevents payload too large errors)
-  for (const catalog of CATALOG_MEMORY_BANK) {
-    try {
-      const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
-      
-      const parts = [
-        { inlineData: { data: catalog.data, mimeType: "application/pdf" } },
-        { text: `Search this catalog for: "${query}". Return a JSON object with a property "items" containing the best 1-2 matches. If no close matches, return empty items.` }
-      ];
-      
-      if (imagePart) parts.push(imagePart);
-
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: SchemaType.OBJECT,
-            properties: {
-              items: {
-                type: SchemaType.ARRAY,
-                items: {
-                  type: SchemaType.OBJECT,
-                  properties: {
-                    name: { type: SchemaType.STRING },
-                    description: { type: SchemaType.STRING },
-                    pageNumber: { type: SchemaType.INTEGER },
-                    visualSummary: { type: SchemaType.STRING },
-                    priceEstimate: { type: SchemaType.STRING },
-                    category: { type: SchemaType.STRING }
-                  },
-                  required: ["name", "description", "visualSummary"]
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // FIX: Clean Markdown formatting (Stops "silent crash" on JSON parsing)
-      const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-      const data = JSON.parse(text);
-
-      if (data.items && Array.isArray(data.items) && data.items.length > 0) {
-        // Tag items with source catalog info
-        const taggedItems = data.items.map((item: any) => ({
-          ...item,
-          id: Math.random().toString(36).substr(2, 9),
-          catalogName: catalog.name,
-          catalogId: catalog.id,
-          category: item.category || "Furniture",
-          priceEstimate: item.priceEstimate || "Contact Dealer"
-        }));
-        allItems.push(...taggedItems);
+  // C. Inject The Prompt
+  parts.push({ text: `You are the Norhaus Engine. Analyze ALL the provided PDF catalogs above. 
+  Find 4-6 furniture items that best match this user query: "${query}". 
+  
+  CRITICAL INSTRUCTIONS:
+  1. Return ONLY valid JSON.
+  2. For every item, identify exactly which Catalog Name it came from.
+  3. Extract the Page Number if visible.
+  
+  Output JSON Schema:
+  {
+    "items": [
+      {
+        "name": "Product Name",
+        "description": "Visual description...",
+        "catalogName": "Exact Filename of the source PDF",
+        "pageNumber": 12,
+        "category": "Seating/Tables/etc",
+        "visualSummary": "Why this matches the query..."
       }
+    ]
+  }` });
 
-    } catch (e: any) {
-      console.error(`Error scanning ${catalog.name}:`, e);
-      // We continue to the next catalog even if one fails
+  try {
+    const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        // We let the model decide the schema structure naturally to avoid rigid constraints on "All at once" reasoning
+      }
+    });
+
+    // 3. Process Response
+    const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+    const data = JSON.parse(text);
+
+    let allItems: FurnitureItem[] = [];
+
+    if (data.items && Array.isArray(data.items)) {
+      allItems = data.items.map((item: any) => ({
+        ...item,
+        id: Math.random().toString(36).substr(2, 9),
+        // If the model didn't return a catalog name, we mark it as "Unknown" 
+        // (This is the risk of "All at once", but Gemini 1.5 is usually good at this)
+        catalogName: item.catalogName || "Detected in Library",
+        catalogId: "000", 
+        priceEstimate: "Contact Dealer"
+      }));
+    }
+
+    return { items: allItems, thinkingProcess: `Successfully scanned ${CATALOG_MEMORY_BANK.length} catalogs simultaneously.` };
+
+  } catch (e: any) {
+    console.error("Norhaus Engine Error:", e);
+    
+    // Safety Fallback Message
+    if (e.message && e.message.includes("400")) {
+      return { items: [], thinkingProcess: "Error: The combined library size is too large for a single search. Please try removing a few large catalogs from the Drive folder." };
+    }
+    
+    return { items: [], thinkingProcess: `Engine Error: ${e.message}` };
+  }
+};
+
     }
   }
 
