@@ -17,7 +17,6 @@ export default async function handler(req, res) {
 
     const vertexAI = new VertexAI({ project: projectId, location: 'us-central1', googleAuthOptions: { credentials } });
     
-    // Safety: Turn off all filters so it doesn't "refuse" to look at furniture
     const safetySettings = [
         { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
         { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -32,13 +31,11 @@ export default async function handler(req, res) {
 
     const { query } = req.body;
     
-    // 1. List Files
     const [files] = await storage.bucket(bucketName).getFiles();
     const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
 
     if (pdfs.length === 0) return res.status(200).json({ items: [], log: "Bucket is empty." });
 
-    // 2. Scan in Parallel
     const searchPromises = pdfs.map(async (file) => {
         try {
             const result = await model.generateContent({
@@ -46,27 +43,42 @@ export default async function handler(req, res) {
                     role: 'user',
                     parts: [
                         { fileData: { fileUri: `gs://${bucketName}/${file.name}`, mimeType: 'application/pdf' } },
-                        { text: `STRICT INSTRUCTION: You are a search engine. Search this document for "${query}".
+                        { text: `STRICT INSTRUCTION: Search this document for "${query}".
                         
                         Rules:
-                        1. Output ONLY valid JSON.
-                        2. Do NOT speak. Do NOT say "I'm sorry" or "I have reviewed".
-                        3. If matches are found, return: { "items": [{ "name": "...", "description": "...", "pageNumber": "..." }] }
-                        4. If NO matches are found, return: { "items": [] }` }
+                        1. Return ONLY valid JSON.
+                        2. NO markdown formatting.
+                        3. Format: { "items": [{ "name": "...", "description": "...", "page_number_digit": "NUMBER ONLY" }] }
+                        4. For "page_number_digit", extract only the actual PDF page number as a digit (e.g., "8", not "Page Y-8").
+                        5. If NO matches, return: { "items": [] }` }
                     ]
                 }]
             });
             
             const response = await result.response;
             let text = response.candidates[0].content.parts[0].text;
+            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            
+            let data = JSON.parse(text);
 
-            // --- THE FIX: CLEAN THE RESPONSE ---
-            // Remove markdown wrappers (```json ... ```)
-            text = text.replace(/```json/g, '').replace(/```/g, '');
-            // Trim whitespace
-            text = text.trim();
+            // --- POWERFUL FIX: Post-process the page number ---
+            if (data.items && Array.isArray(data.items)) {
+                data.items = data.items.map(item => {
+                    let cleanPage = null;
+                    // Look for the new field first
+                    let rawPage = item.page_number_digit || item.pageNumber;
+                    if (rawPage) {
+                        // Extract the very first sequence of numbers found
+                        const match = rawPage.toString().match(/(\d+)/);
+                        if (match) {
+                            cleanPage = match[0];
+                        }
+                    }
+                    return { ...item, pageNumber: cleanPage }; // Standardize on "pageNumber"
+                });
+            }
 
-            return JSON.parse(text);
+            return data;
 
         } catch (e) {
             console.error(`Error scanning ${file.name}:`, e.message);
@@ -87,7 +99,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ 
         items: allItems, 
-        thinkingProcess: `Scanned ${pdfs.length} catalogs. Found ${allItems.length} results.` 
+        thinkingProcess: `Scanned ${pdfs.length} catalogs. Found ${allItems.length} matches.` 
     });
 
   } catch (error) {
