@@ -20,25 +20,23 @@ const XCircleIcon = () => (
 );
 
 // --- Helper: Clean Title Case Filenames ---
-// Turns "MERIDIAN_FURNITURE_LOOKBOOK.pdf" into "Meridian Furniture Lookbook"
 const formatCatalogName = (filename: string) => {
     if (!filename) return "Unknown Catalog";
-    // 1. Remove extension
     let clean = filename.replace('.pdf', '');
-    // 2. Replace separators with spaces
     clean = clean.replace(/_/g, ' ').replace(/-/g, ' ');
-    // 3. Title Case
     return clean.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
-// --- The PDF Viewer Modal ---
+// --- The PDF Viewer Modal (Improved for iPad) ---
 const PDFViewerModal: React.FC<{ item: FurnitureItem | null, onClose: () => void }> = ({ item, onClose }) => {
   if (!item) return null;
 
   const cleanName = encodeURIComponent(item.catalogName);
-  let url = `https://storage.googleapis.com/norhaus_catalogues/${cleanName}`;
+  const baseUrl = `https://storage.googleapis.com/norhaus_catalogues/${cleanName}`;
   const pageNum = item.pageNumber;
-  const deepLinkUrl = pageNum ? `${url}#page=${pageNum}` : url;
+  
+  // Create the Deep Link
+  const deepLinkUrl = pageNum ? `${baseUrl}#page=${pageNum}` : baseUrl;
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col animate-in fade-in duration-200">
@@ -51,6 +49,7 @@ const PDFViewerModal: React.FC<{ item: FurnitureItem | null, onClose: () => void
         </div>
         
         <div className="flex items-center gap-4">
+            {/* iPad Fail-Safe Button */}
             <a 
               href={deepLinkUrl} 
               target="_blank" 
@@ -65,21 +64,36 @@ const PDFViewerModal: React.FC<{ item: FurnitureItem | null, onClose: () => void
             </button>
         </div>
       </div>
+      
+      {/* UPDATED VIEWER: 
+         1. Uses <object> instead of <iframe> for better PDF support.
+         2. Uses key={deepLinkUrl} to force React to completely rebuild the viewer 
+            when the page changes, helping the browser "see" the page jump.
+      */}
       <div className="flex-1 w-full bg-[#333] relative">
-         <iframe src={deepLinkUrl} className="w-full h-full border-none" title="PDF Viewer" />
+         <object 
+           key={deepLinkUrl} 
+           data={deepLinkUrl} 
+           type="application/pdf" 
+           className="w-full h-full block"
+         >
+           {/* Fallback for very old browsers or strict settings */}
+           <div className="flex items-center justify-center h-full text-white">
+             <p>Unable to display PDF directly. Please use the "Open Page" button above.</p>
+           </div>
+         </object>
       </div>
     </div>
   );
 };
 
-// --- The New Structured Card ---
+// --- The Result Card ---
 const ItemCard: React.FC<{ item: FurnitureItem, onClick: () => void }> = ({ item, onClick }) => {
   return (
     <div 
       onClick={onClick}
       className="luxury-card rounded-sm overflow-hidden flex flex-col h-full group animate-fade-up cursor-pointer hover:shadow-2xl transition-all duration-500 bg-white border border-[#f0ede6]"
     >
-      {/* Visual Placeholder Area */}
       <div className="h-48 relative overflow-hidden bg-[#f8f6f3] flex items-center justify-center p-6 group-hover:bg-[#e8e5de] transition-colors">
         <div className="text-center opacity-30 group-hover:opacity-50 transition-opacity transform group-hover:scale-110 duration-500">
             <svg className="w-12 h-12 text-[#434738]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -90,20 +104,15 @@ const ItemCard: React.FC<{ item: FurnitureItem, onClick: () => void }> = ({ item
       </div>
 
       <div className="p-6 flex flex-col flex-1 text-left">
-        {/* 1. Name of Furniture (Top, Big, Bold) */}
         <h3 className="text-xl font-medium serif text-[#3a3d31] mb-2 leading-tight">
             {item.name}
         </h3>
-
-        {/* 2. AI Description (Below Name, Readable) */}
         <p className="text-xs text-[#7c766d] leading-relaxed mb-6 flex-1 line-clamp-3">
           {item.description}
         </p>
 
-        {/* Divider */}
         <div className="h-px bg-[#f0ede6] w-full mb-4"></div>
 
-        {/* 3 & 4. Catalog & Page (Footer) */}
         <div className="flex items-start justify-between gap-4">
              <div className="flex flex-col">
                 <span className="text-[8px] font-bold text-[#b0a99f] uppercase tracking-widest mb-1">Source Catalog</span>
