@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import { Catalog, FurnitureItem, SearchMode, SyncStatus } from './types';
 import { searchFurniture, syncAndCacheLibrary } from './geminiService';
 import * as pdfjs from 'pdfjs-dist';
@@ -83,17 +84,21 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleSync = async () => {
+const login = useGoogleLogin({
+  onSuccess: async (tokenResponse) => {
     if (!driveFolderId) return;
     setSyncStatus({ state: 'syncing' });
     try {
-      const { catalogMetadata, cacheName } = await syncAndCacheLibrary(driveFolderId, "SIMULATED_TOKEN");
+      // Now we use the REAL access token from Google
+      const { catalogMetadata, cacheName } = await syncAndCacheLibrary(driveFolderId, tokenResponse.access_token);
       setSyncStatus({ state: 'ready', cacheName, lastSync: new Date() });
       setCatalogs(catalogMetadata);
     } catch (e: any) {
       setSyncStatus({ state: 'error', error: e.message });
     }
-  };
+  },
+  scope: 'https://www.googleapis.com/auth/drive.readonly', // Request permission to read Drive
+});
 
   const handleSearch = async () => {
     if (syncStatus.state !== 'ready') return;
@@ -260,7 +265,7 @@ const App: React.FC = () => {
                           />
                         </div>
                         <button 
-                          onClick={handleSync}
+                          onClick={() => login()} 
                           disabled={syncStatus.state === 'syncing'}
                           className="w-full py-5 luxury-button rounded-sm text-xs shadow-xl active:scale-[0.99] disabled:opacity-30"
                         >
@@ -322,4 +327,11 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+const WrappedApp = () => (
+  <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+    <App />
+  </GoogleOAuthProvider>
+);
+
+export default WrappedApp;
+
