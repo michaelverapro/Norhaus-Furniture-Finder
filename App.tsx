@@ -282,7 +282,9 @@ const login = useGoogleLogin({
                     <div className="bg-white/50 p-10 border border-[#e8e4dc] space-y-8 rounded-sm">
                       <div className="flex justify-between items-baseline border-b border-[#f3f0e9] pb-4">
                         <span className="text-[10px] text-[#b0a99f] uppercase tracking-tighter font-bold">Inference Status</span>
-                        <span className="text-xs font-bold uppercase text-[#434738]">{syncStatus.state}</span>
+                        <span className={`text-xs font-bold uppercase ${syncStatus.state === 'error' ? 'text-red-500' : 'text-[#434738]'}`}>
+                            {syncStatus.state} {syncStatus.error && `— ${syncStatus.error}`}
+                        </span>
                       </div>
                       {syncStatus.lastSync && (
                         <div className="flex justify-between items-baseline border-b border-[#f3f0e9] pb-4">
