@@ -1,200 +1,171 @@
-// geminiService.ts - Robust JSON Handling
+// geminiService.ts - Batch Processing (Safe Mode)
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { SearchResult, Catalog } from "../types";
+import { SearchResult, FurnitureItem, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-
-// SWITCH TO FLASH: It is faster and more reliable for "Live" demos on iPad
-const SEARCH_MODEL_NAME = "gemini-1.5-flash-latest"; 
-
+const SEARCH_MODEL_NAME = "gemini-1.5-flash-latest"; // Flash is fast enough for loops
 const CACHE_KEY_STORAGE = 'norhaus_cache_token';
 const DB_NAME = 'NorhausDB';
 const STORE_NAME = 'files';
 
-// --- IN-MEMORY CACHE ---
-let CATALOG_MEMORY_BANK: { mimeType: string; data: string }[] = [];
+// --- DATABASE LOGIC ---
+let CATALOG_MEMORY_BANK: { id: string; name: string; mimeType: string; data: string }[] = [];
 
-// --- DATABASE HELPERS ---
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
+      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 };
 
-const saveToDB = async (file: { id: string; mimeType: string; data: string }) => {
+const saveToDB = async (file: any) => {
   const db = await openDB();
-  return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(file);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  tx.objectStore(STORE_NAME).put(file);
 };
 
-const loadFromDB = async (): Promise<{ mimeType: string; data: string }[]> => {
+const loadFromDB = async (): Promise<any[]> => {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const request = tx.objectStore(STORE_NAME).getAll();
-    request.onsuccess = () => {
-      const files = request.result.map((f: any) => ({
-        mimeType: f.mimeType,
-        data: f.data
-      }));
-      resolve(files);
-    };
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => resolve([]);
   });
 };
 
-// --- MAIN FUNCTIONS ---
-
-export const syncAndCacheLibrary = async (
-  folderId: string, 
-  accessToken: string
-): Promise<{ cacheName: string; catalogMetadata: Catalog[] }> => {
-  console.log("Norhaus: Starting Automated Sync...");
-
+// --- SYNC ---
+export const syncAndCacheLibrary = async (folderId: string, accessToken: string) => {
   const driveFiles = await listFolderContents(folderId, accessToken);
-  if (driveFiles.length === 0) throw new Error("No PDFs found in Drive.");
+  if (driveFiles.length === 0) throw new Error("No PDFs found.");
 
+  CATALOG_MEMORY_BANK = [];
   const catalogMetadata: Catalog[] = [];
-  CATALOG_MEMORY_BANK = []; 
 
   for (const file of driveFiles) {
     console.log(`Downloading: ${file.name}`);
     const base64Data = await downloadDriveFile(file.id, accessToken);
     
-    const fileEntry = {
-      id: file.id,
-      mimeType: "application/pdf",
-      data: base64Data
-    };
+    const entry = { id: file.id, name: file.name, mimeType: "application/pdf", data: base64Data };
+    
+    // Save to RAM and DB
+    CATALOG_MEMORY_BANK.push(entry);
+    await saveToDB(entry);
 
-    CATALOG_MEMORY_BANK.push({ mimeType: fileEntry.mimeType, data: fileEntry.data });
-    await saveToDB(fileEntry);
-
-    catalogMetadata.push({
-      id: file.id,
-      name: file.name,
-      driveId: file.id,
-      uploadDate: new Date()
-    });
+    catalogMetadata.push({ id: file.id, name: file.name, driveId: file.id, uploadDate: new Date() });
   }
 
-  const simulatedCacheName = `persistent-bank-${Date.now()}`;
-  localStorage.setItem(CACHE_KEY_STORAGE, JSON.stringify({
-    name: simulatedCacheName,
-    folderId,
-    timestamp: Date.now(),
-    catalogMetadata
-  }));
-
-  return { cacheName: simulatedCacheName, catalogMetadata };
+  const cacheName = `persistent-${Date.now()}`;
+  localStorage.setItem(CACHE_KEY_STORAGE, JSON.stringify({ name: cacheName, folderId, timestamp: Date.now(), catalogMetadata }));
+  return { cacheName, catalogMetadata };
 };
 
-export const searchFurniture = async (
-  query: string,
-  imageFile?: File
-): Promise<SearchResult> => {
+// --- BATCH SEARCH ---
+export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   
-  // 1. CHECK MEMORY BANK
+  // 1. Load Data if RAM is empty
   if (CATALOG_MEMORY_BANK.length === 0) {
-    try {
-      const storedFiles = await loadFromDB();
-      if (storedFiles.length > 0) {
-        CATALOG_MEMORY_BANK = storedFiles;
-      } else {
-        return { items: [], thinkingProcess: "Database empty. Please Sync." };
-      }
-    } catch (e) {
-      return { items: [], thinkingProcess: "Database Error." };
-    }
+    const stored = await loadFromDB();
+    if (stored.length > 0) CATALOG_MEMORY_BANK = stored;
+    else return { items: [], thinkingProcess: "Library empty. Please Sync." };
   }
 
-  // 2. PREPARE AI REQUEST
-  const model = genAI.getGenerativeModel({
-    model: SEARCH_MODEL_NAME,
-    systemInstruction: `You are the Norhaus Engine.
-      1. SEARCH GOAL: Find furniture items matching the user's query in the attached PDFs.
-      2. VISUALS: If an image is provided, match its style.
-      3. OUTPUT: Return strictly valid JSON.`
-  });
-
-  const parts: any[] = [];
-
-  CATALOG_MEMORY_BANK.forEach(file => {
-    parts.push({ inlineData: file });
-  });
-
+  // 2. Prepare the Image (re-used for every request)
+  let imagePart: any = null;
   if (imageFile) {
     const reader = new FileReader();
-    const base64Image = await new Promise<string>((resolve) => {
-      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    const base64 = await new Promise<string>(r => {
+      reader.onload = () => r((reader.result as string).split(',')[1]);
       reader.readAsDataURL(imageFile);
     });
-    parts.push({
-      inlineData: {
-        data: base64Image,
-        mimeType: imageFile.type
-      }
-    });
+    imagePart = { inlineData: { data: base64, mimeType: imageFile.type } };
   }
 
-  parts.push({ text: `Find 4-6 items matching: "${query}". Return JSON.` });
+  const allItems: FurnitureItem[] = [];
+  let debugLog = "Processing Catalogs:\n";
 
-  try {
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts }],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            thinkingProcess: { type: SchemaType.STRING },
-            items: {
-              type: SchemaType.ARRAY,
+  // 3. LOOP through catalogs ONE BY ONE
+  // We limit to searching the first 5 to prevent long waits/timeouts in this demo
+  const activeCatalogs = CATALOG_MEMORY_BANK.slice(0, 5); 
+
+  for (const catalog of activeCatalogs) {
+    try {
+      debugLog += `Scanning ${catalog.name}...\n`;
+      
+      const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
+      const parts = [
+        { inlineData: { data: catalog.data, mimeType: "application/pdf" } }, // Only 1 PDF
+        { text: `Search this catalog for: "${query}". Return 1-2 best matches as JSON.` }
+      ];
+      if (imagePart) parts.push(imagePart);
+
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
               items: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  id: { type: SchemaType.STRING },
-                  name: { type: SchemaType.STRING },
-                  description: { type: SchemaType.STRING },
-                  pageNumber: { type: SchemaType.INTEGER },
-                  catalogName: { type: SchemaType.STRING },
-                  category: { type: SchemaType.STRING },
-                  visualSummary: { type: SchemaType.STRING }
-                },
-                required: ["name", "description", "visualSummary"]
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    name: { type: SchemaType.STRING },
+                    description: { type: SchemaType.STRING },
+                    pageNumber: { type: SchemaType.INTEGER },
+                    visualSummary: { type: SchemaType.STRING }
+                  }
+                }
               }
             }
           }
         }
+      });
+
+      const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+      const data = JSON.parse(text);
+      
+      // Add Catalog Metadata to the items found
+      if (data.items && Array.isArray(data.items)) {
+        const taggedItems = data.items.map((item: any) => ({
+          ...item,
+          id: Math.random().toString(36).substr(2, 9),
+          catalogName: catalog.name, // Important: Tag the source
+          catalogId: catalog.id,
+          category: "Furniture",
+          priceEstimate: "Contact Dealer"
+        }));
+        allItems.push(...taggedItems);
       }
-    });
-
-    let text = result.response.text();
-    
-    // --- THE FIX: CLEAN MARKDOWN ---
-    // Gemini often wraps JSON in ```json ... ```. We must strip this.
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    const data = JSON.parse(text) as SearchResult;
-    return { ...data, isCached: true };
-
-  } catch (e: any) {
-    console.error("Norhaus Engine Error:", e);
-    // Return the ACTUAL error so we can see it in the UI
-    return { items: [], thinkingProcess: `Engine Error: ${e.message}` };
+    } catch (e) {
+      console.error(`Error scanning ${catalog.name}`, e);
+      debugLog += `Failed to read ${catalog.name}\n`;
+    }
   }
+
+  if (allItems.length === 0) {
+    // If we fail, return a fake item so the user SEES the error log
+    return { 
+      items: [{
+        id: "error-log",
+        name: "Search Complete - No Matches",
+        description: debugLog,
+        pageNumber: 0,
+        catalogName: "System Log",
+        catalogId: "0",
+        category: "System",
+        visualSummary: "Try a different query or fewer documents."
+      }],
+      thinkingProcess: debugLog
+    };
+  }
+
+  return { items: allItems, thinkingProcess: debugLog };
 };
