@@ -1,10 +1,14 @@
-// geminiService.ts - Batch Processing (Safe Mode)
+// geminiService.ts - DIAGNOSTICS MODE
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { SearchResult, FurnitureItem, Catalog } from "../types";
 import { downloadDriveFile, listFolderContents } from "./driveService";
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-const SEARCH_MODEL_NAME = "gemini-1.5-flash-latest"; // Flash is fast enough for loops
+// 1. CHECK API KEY
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+if (!apiKey) console.error("CRITICAL: API Key is missing!");
+
+const genAI = new GoogleGenerativeAI(apiKey || "MISSING_KEY");
+const SEARCH_MODEL_NAME = "gemini-1.5-flash-latest"; 
 const CACHE_KEY_STORAGE = 'norhaus_cache_token';
 const DB_NAME = 'NorhausDB';
 const STORE_NAME = 'files';
@@ -52,9 +56,13 @@ export const syncAndCacheLibrary = async (folderId: string, accessToken: string)
     console.log(`Downloading: ${file.name}`);
     const base64Data = await downloadDriveFile(file.id, accessToken);
     
+    // SAFETY CHECK: Ensure file is not empty
+    if (!base64Data || base64Data.length < 100) {
+      console.warn(`File ${file.name} seems empty or corrupt.`);
+    }
+
     const entry = { id: file.id, name: file.name, mimeType: "application/pdf", data: base64Data };
     
-    // Save to RAM and DB
     CATALOG_MEMORY_BANK.push(entry);
     await saveToDB(entry);
 
@@ -66,106 +74,83 @@ export const syncAndCacheLibrary = async (folderId: string, accessToken: string)
   return { cacheName, catalogMetadata };
 };
 
-// --- BATCH SEARCH ---
+// --- DIAGNOSTIC SEARCH ---
 export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   
-  // 1. Load Data if RAM is empty
+  // STEP 1: LOAD
   if (CATALOG_MEMORY_BANK.length === 0) {
     const stored = await loadFromDB();
     if (stored.length > 0) CATALOG_MEMORY_BANK = stored;
-    else return { items: [], thinkingProcess: "Library empty. Please Sync." };
+    else return { items: [], thinkingProcess: "DIAGNOSTIC: Memory Empty. Please Sync." };
   }
 
-  // 2. Prepare the Image (re-used for every request)
-  let imagePart: any = null;
-  if (imageFile) {
-    const reader = new FileReader();
-    const base64 = await new Promise<string>(r => {
-      reader.onload = () => r((reader.result as string).split(',')[1]);
-      reader.readAsDataURL(imageFile);
-    });
-    imagePart = { inlineData: { data: base64, mimeType: imageFile.type } };
-  }
+  // STEP 2: VERIFY DATA INTEGRITY
+  const activeCatalogs = CATALOG_MEMORY_BANK.slice(0, 3); // Test first 3 only
+  let diagnosticsLog = `API Key Status: ${apiKey ? "Present" : "MISSING"}\n`;
+  diagnosticsLog += `Catalogs Loaded: ${CATALOG_MEMORY_BANK.length}\n`;
 
   const allItems: FurnitureItem[] = [];
-  let debugLog = "Processing Catalogs:\n";
-
-  // 3. LOOP through catalogs ONE BY ONE
-  // We limit to searching the first 5 to prevent long waits/timeouts in this demo
-  const activeCatalogs = CATALOG_MEMORY_BANK.slice(0, 5); 
 
   for (const catalog of activeCatalogs) {
     try {
-      debugLog += `Scanning ${catalog.name}...\n`;
-      
-      const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
-      const parts = [
-        { inlineData: { data: catalog.data, mimeType: "application/pdf" } }, // Only 1 PDF
-        { text: `Search this catalog for: "${query}". Return 1-2 best matches as JSON.` }
-      ];
-      if (imagePart) parts.push(imagePart);
+      const kbSize = Math.round(catalog.data.length / 1024);
+      diagnosticsLog += `\nScanning: ${catalog.name} (${kbSize} KB)... `;
 
+      if (kbSize < 5) {
+        diagnosticsLog += " [FAILED: FILE TOO SMALL - LIKELY CORRUPT DOWNLOAD]";
+        continue;
+      }
+
+      const model = genAI.getGenerativeModel({ model: SEARCH_MODEL_NAME });
       const result = await model.generateContent({
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: SchemaType.OBJECT,
-            properties: {
-              items: {
-                type: SchemaType.ARRAY,
-                items: {
-                  type: SchemaType.OBJECT,
-                  properties: {
-                    name: { type: SchemaType.STRING },
-                    description: { type: SchemaType.STRING },
-                    pageNumber: { type: SchemaType.INTEGER },
-                    visualSummary: { type: SchemaType.STRING }
-                  }
-                }
-              }
-            }
-          }
-        }
+        contents: [{ 
+          role: "user", 
+          parts: [
+            { inlineData: { data: catalog.data, mimeType: "application/pdf" } },
+            { text: `Return a JSON object with a single property "items" containing 1 furniture item that matches "${query}".` }
+          ] 
+        }],
+        generationConfig: { responseMimeType: "application/json" }
       });
 
       const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
       const data = JSON.parse(text);
       
-      // Add Catalog Metadata to the items found
+      diagnosticsLog += " [SUCCESS]";
+      
       if (data.items && Array.isArray(data.items)) {
-        const taggedItems = data.items.map((item: any) => ({
+        allItems.push(...data.items.map((item: any) => ({
           ...item,
           id: Math.random().toString(36).substr(2, 9),
-          catalogName: catalog.name, // Important: Tag the source
+          catalogName: catalog.name,
           catalogId: catalog.id,
           category: "Furniture",
-          priceEstimate: "Contact Dealer"
-        }));
-        allItems.push(...taggedItems);
+          visualSummary: `Matched in ${catalog.name}`
+        })));
       }
-    } catch (e) {
-      console.error(`Error scanning ${catalog.name}`, e);
-      debugLog += `Failed to read ${catalog.name}\n`;
+    } catch (e: any) {
+      console.error(e);
+      // CAPTURE THE EXACT API ERROR
+      diagnosticsLog += ` [API ERROR: ${e.message}]`;
     }
   }
 
+  // FORCE RETURN THE LOG SO WE CAN SEE IT
   if (allItems.length === 0) {
-    // If we fail, return a fake item so the user SEES the error log
     return { 
       items: [{
-        id: "error-log",
-        name: "Search Complete - No Matches",
-        description: debugLog,
+        id: "diag-log",
+        name: "DIAGNOSTIC REPORT",
+        description: diagnosticsLog, // READ THIS TEXT ON SCREEN
         pageNumber: 0,
-        catalogName: "System Log",
+        catalogName: "System",
         catalogId: "0",
-        category: "System",
-        visualSummary: "Try a different query or fewer documents."
+        category: "Debug",
+        visualSummary: "Check the description for the exact error."
       }],
-      thinkingProcess: debugLog
+      thinkingProcess: diagnosticsLog
     };
   }
 
-  return { items: allItems, thinkingProcess: debugLog };
+  return { items: allItems, thinkingProcess: diagnosticsLog };
 };
