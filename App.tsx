@@ -16,13 +16,19 @@ const ExternalLinkIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
 );
 const XCircleIcon = () => (
-    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
-  );
+  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+);
 
-// Helper to make filenames look nice (removes .pdf and underscores)
+// --- Helper: Clean Title Case Filenames ---
+// Turns "MERIDIAN_FURNITURE_LOOKBOOK.pdf" into "Meridian Furniture Lookbook"
 const formatCatalogName = (filename: string) => {
     if (!filename) return "Unknown Catalog";
-    return filename.replace('.pdf', '').replace(/_/g, ' ').replace(/-/g, ' ');
+    // 1. Remove extension
+    let clean = filename.replace('.pdf', '');
+    // 2. Replace separators with spaces
+    clean = clean.replace(/_/g, ' ').replace(/-/g, ' ');
+    // 3. Title Case
+    return clean.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
 // --- The PDF Viewer Modal ---
@@ -66,40 +72,52 @@ const PDFViewerModal: React.FC<{ item: FurnitureItem | null, onClose: () => void
   );
 };
 
-// --- The Result Card ---
+// --- The New Structured Card ---
 const ItemCard: React.FC<{ item: FurnitureItem, onClick: () => void }> = ({ item, onClick }) => {
   return (
     <div 
       onClick={onClick}
-      className="luxury-card rounded-sm overflow-hidden flex flex-col h-full group animate-fade-up cursor-pointer hover:shadow-2xl transition-all duration-500 bg-white"
+      className="luxury-card rounded-sm overflow-hidden flex flex-col h-full group animate-fade-up cursor-pointer hover:shadow-2xl transition-all duration-500 bg-white border border-[#f0ede6]"
     >
-      {/* 1. Visual Area (Click Action) */}
-      <div className="h-64 relative overflow-hidden bg-[#f0ede6] flex items-center justify-center p-8 group-hover:bg-[#e8e5de] transition-colors">
+      {/* Visual Placeholder Area */}
+      <div className="h-48 relative overflow-hidden bg-[#f8f6f3] flex items-center justify-center p-6 group-hover:bg-[#e8e5de] transition-colors">
         <div className="text-center opacity-30 group-hover:opacity-50 transition-opacity transform group-hover:scale-110 duration-500">
-            <svg className="w-20 h-20 text-[#434738]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            <svg className="w-12 h-12 text-[#434738]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
         </div>
-        
-        {/* 4. Page Number (Badge) */}
-        <div className="absolute bottom-4 right-4 text-[9px] font-bold text-[#434738] uppercase tracking-widest border border-[#434738]/20 px-2 py-1 bg-white/50">
-          Page {item.pageNumber || '?'}
+        <div className="absolute top-3 right-3 text-[9px] font-bold text-[#b0a99f] uppercase tracking-widest bg-white px-2 py-1 rounded-sm shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+            View PDF
         </div>
       </div>
 
-      <div className="p-6 flex flex-col flex-1 text-left bg-white">
-        {/* 3. Catalog Name (Top Label) */}
-        <p className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-[0.3em] mb-3 truncate border-b border-[#f0ede6] pb-2">
-            {formatCatalogName(item.catalogName)}
-        </p>
-
-        {/* 1. Name of Furniture */}
-        <h3 className="text-xl font-normal text-[#3a3d31] mb-3 leading-tight line-clamp-2">
+      <div className="p-6 flex flex-col flex-1 text-left">
+        {/* 1. Name of Furniture (Top, Big, Bold) */}
+        <h3 className="text-xl font-medium serif text-[#3a3d31] mb-2 leading-tight">
             {item.name}
         </h3>
 
-        {/* 2. AI Description */}
-        <p className="text-xs text-[#7c766d] leading-relaxed mb-4 flex-1 line-clamp-4 italic serif">
-          "{item.description}"
+        {/* 2. AI Description (Below Name, Readable) */}
+        <p className="text-xs text-[#7c766d] leading-relaxed mb-6 flex-1 line-clamp-3">
+          {item.description}
         </p>
+
+        {/* Divider */}
+        <div className="h-px bg-[#f0ede6] w-full mb-4"></div>
+
+        {/* 3 & 4. Catalog & Page (Footer) */}
+        <div className="flex items-start justify-between gap-4">
+             <div className="flex flex-col">
+                <span className="text-[8px] font-bold text-[#b0a99f] uppercase tracking-widest mb-1">Source Catalog</span>
+                <span className="text-[10px] font-bold text-[#434738] uppercase tracking-wider leading-tight line-clamp-1" title={formatCatalogName(item.catalogName)}>
+                    {formatCatalogName(item.catalogName)}
+                </span>
+             </div>
+             <div className="flex flex-col items-end min-w-[50px]">
+                <span className="text-[8px] font-bold text-[#b0a99f] uppercase tracking-widest mb-1">Page</span>
+                <span className="text-[10px] font-bold text-[#434738] uppercase tracking-wider">
+                    {item.pageNumber || 'N/A'}
+                </span>
+             </div>
+        </div>
       </div>
     </div>
   );
@@ -221,7 +239,7 @@ const App: React.FC = () => {
           {isSearching ? (
              <div className="flex flex-col items-center justify-center py-24 opacity-60">
                 <div className="w-10 h-10 border-b-2 border-[#434738] rounded-full animate-spin mb-6" />
-                <p className="text-xs uppercase tracking-[0.2em] text-[#b0a99f]">Analyzing Archives...</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-[#b0a99f]">Scanning Full Archives...</p>
              </div>
           ) : results.length > 0 ? (
             <div className="max-w-[1600px] mx-auto">
