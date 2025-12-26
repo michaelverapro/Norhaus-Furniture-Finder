@@ -232,9 +232,10 @@ const App: React.FC = () => {
                 <div className="max-w-[1920px] mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-[#434738] rounded-full"></div>
+                        {/* --- UPDATED HEADER TEXT --- */}
                         <span className="text-lg font-bold tracking-tight uppercase">Norhaus</span>
                         <span className="mx-1 text-[#b0a99f]">-</span>
-                        <span className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">AI Powered Catalogue Search</span>
+                        <span className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">Gemini Powered Catalogue Search</span>
                     </div>
                     <div className="text-[10px] font-bold text-[#b0a99f] uppercase tracking-widest">Engine: Vercel Pro</div>
                 </div>
