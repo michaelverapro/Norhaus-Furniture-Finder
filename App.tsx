@@ -9,7 +9,6 @@ import { searchFurniture } from './geminiService';
 const formatCatalogName = (filename: string) => {
     if (!filename) return "Unknown";
     let clean = filename.replace('.pdf', '').replace(/_/g, ' ').replace(/-/g, ' ');
-    // Truncate if too long for compact view
     if (clean.length > 25) clean = clean.substring(0, 25) + "...";
     return clean.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
@@ -19,7 +18,6 @@ const PaperclipIcon = () => <svg className="w-5 h-5" fill="none" stroke="current
 const CloseIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" /></svg>;
 const ExternalLinkIcon = () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>;
 const XCircleIcon = () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>;
-// Smaller icon for compact cards
 const FurnitureIcon = () => <svg className="w-8 h-8 text-[#434738] opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
 
 // ==========================================
@@ -82,31 +80,26 @@ const SearchInput = memo(({ onSearch, isSearching }: { onSearch: (q: string, f: 
     );
 });
 
-// -- COMPACT CARD DESIGN --
 const ItemCard = memo(({ item, onClick }: { item: FurnitureItem, onClick: () => void }) => {
     return (
         <div
             onClick={onClick}
             className="bg-white rounded-lg border border-[#f0ede6] overflow-hidden cursor-pointer hover:shadow-xl hover:border-[#d6d3cc] transition-all duration-300 group flex flex-col h-full"
         >
-            {/* Compact Header Area */}
             <div className="h-32 bg-[#faf9f6] relative flex items-center justify-center border-b border-[#f0ede6] group-hover:bg-[#f0ede6] transition-colors">
                 <FurnitureIcon />
                 
-                {/* Dimensions Badge */}
                 {item.dimensions && (
                     <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur border border-[#e8e4dc] text-[#434738] text-[9px] font-bold px-2 py-0.5 rounded shadow-sm">
                         {item.dimensions}
                     </div>
                 )}
                 
-                {/* Page Badge */}
                 <div className="absolute top-2 right-2 bg-[#434738] text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">
                     Pg {item.pageNumber || '?'}
                 </div>
             </div>
 
-            {/* Compact Content Body */}
             <div className="p-4 flex flex-col flex-1">
                 <div className="mb-2">
                     <div className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-wider truncate mb-1">
@@ -180,6 +173,9 @@ const App: React.FC = () => {
     const [thinkingLog, setThinkingLog] = useState('');
     const [selectedItem, setSelectedItem] = useState<FurnitureItem | null>(null);
 
+    // --- NEW LOGIC: Calculate Unique Catalogs ---
+    const uniqueCatalogs = new Set(results.map(r => r.catalogName)).size;
+
     const handleSearch = useCallback(async (query: string, file: File | null) => {
         if (!query && !file) return;
         setIsSearching(true);
@@ -217,13 +213,11 @@ const App: React.FC = () => {
             </header>
 
             <main className="flex-1 max-w-[1920px] mx-auto w-full px-8 py-12 flex flex-col">
-                {/* Search Section */}
                 <div className="mb-16 text-center">
                     <h1 className="text-4xl font-serif text-[#3a3d31] mb-8 animate-fade-up">Explore the archives.</h1>
                     <SearchInput onSearch={handleSearch} isSearching={isSearching} />
                 </div>
 
-                {/* Results Grid - High Density */}
                 <div className="flex-1">
                     {isSearching ? (
                         <div className="text-center py-20 opacity-50 animate-pulse">
@@ -231,11 +225,13 @@ const App: React.FC = () => {
                         </div>
                     ) : results.length > 0 ? (
                         <div className="animate-fade-up">
+                            {/* --- NEW HEADER DISPLAY --- */}
                             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#f0ede6]">
-                                <h2 className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">{results.length} Matches Found</h2>
+                                <h2 className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">
+                                    {results.length} Matches Found <span className="text-slate-300 mx-2">•</span> From {uniqueCatalogs} Catalogs
+                                </h2>
                             </div>
                             
-                            {/* DENSE GRID: Up to 5 columns on big screens */}
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                                 {results.map((item, idx) => (
                                     <ItemCard key={idx} item={item} onClick={() => setSelectedItem(item)} />
