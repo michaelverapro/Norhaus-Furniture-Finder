@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, memo } from 'react';
+import React, { useState, useRef, useCallback, memo, useMemo } from 'react';
 import { FurnitureItem } from './types';
 import { searchFurniture } from './geminiService';
 
@@ -17,8 +17,9 @@ const SearchIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentCol
 const PaperclipIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>;
 const CloseIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" /></svg>;
 const ExternalLinkIcon = () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>;
-const XCircleIcon = () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>;
+const XCircleIcon = () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>;
 const FurnitureIcon = () => <svg className="w-8 h-8 text-[#434738] opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+const LayersIcon = () => <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>;
 
 // ==========================================
 // 2. ISOLATED COMPONENTS
@@ -53,17 +54,8 @@ const SearchInput = memo(({ onSearch, isSearching }: { onSearch: (q: string, f: 
                     className="flex-1 bg-transparent py-4 px-4 text-lg outline-none serif placeholder:text-slate-300"
                 />
                 <div className="flex items-center gap-2 pr-2">
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="p-3 text-[#b0a99f] hover:text-[#434738] hover:bg-slate-50 transition-all rounded-full"
-                    >
-                        <PaperclipIcon />
-                    </button>
-                    <button
-                        onClick={handleTrigger}
-                        disabled={isSearching}
-                        className="bg-[#434738] hover:bg-[#33362a] text-white px-8 py-3 rounded-full text-xs font-bold tracking-widest uppercase transition-all shadow-md disabled:opacity-50"
-                    >
+                    <button onClick={() => fileInputRef.current?.click()} className="p-3 text-[#b0a99f] hover:text-[#434738] hover:bg-slate-50 transition-all rounded-full"><PaperclipIcon /></button>
+                    <button onClick={handleTrigger} disabled={isSearching} className="bg-[#434738] hover:bg-[#33362a] text-white px-8 py-3 rounded-full text-xs font-bold tracking-widest uppercase transition-all shadow-md disabled:opacity-50">
                         {isSearching ? '...' : 'Search'}
                     </button>
                 </div>
@@ -80,12 +72,15 @@ const SearchInput = memo(({ onSearch, isSearching }: { onSearch: (q: string, f: 
     );
 });
 
-const ItemCard = memo(({ item, onClick }: { item: FurnitureItem, onClick: () => void }) => {
+// -- UPDATED: ItemCard handles Groups --
+// We now pass "variants" (an array of items) instead of a single item
+const ItemCard = memo(({ group, onClick }: { group: FurnitureItem[], onClick: () => void }) => {
+    // Primary item is the first one found
+    const item = group[0];
+    const variantCount = group.length;
+
     return (
-        <div
-            onClick={onClick}
-            className="bg-white rounded-lg border border-[#f0ede6] overflow-hidden cursor-pointer hover:shadow-xl hover:border-[#d6d3cc] transition-all duration-300 group flex flex-col h-full"
-        >
+        <div onClick={onClick} className="bg-white rounded-lg border border-[#f0ede6] overflow-hidden cursor-pointer hover:shadow-xl hover:border-[#d6d3cc] transition-all duration-300 group flex flex-col h-full relative">
             <div className="h-32 bg-[#faf9f6] relative flex items-center justify-center border-b border-[#f0ede6] group-hover:bg-[#f0ede6] transition-colors">
                 <FurnitureIcon />
                 
@@ -95,29 +90,27 @@ const ItemCard = memo(({ item, onClick }: { item: FurnitureItem, onClick: () => 
                     </div>
                 )}
                 
-                <div className="absolute top-2 right-2 bg-[#434738] text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">
-                    Pg {item.pageNumber || '?'}
-                </div>
+                {/* Variant Badge (if multiple) */}
+                {variantCount > 1 ? (
+                    <div className="absolute top-2 right-2 bg-[#434738] text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
+                        <LayersIcon />
+                        <span>{variantCount} Variants</span>
+                    </div>
+                ) : (
+                    <div className="absolute top-2 right-2 bg-[#434738] text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">
+                        Pg {item.pageNumber || '?'}
+                    </div>
+                )}
             </div>
 
             <div className="p-4 flex flex-col flex-1">
                 <div className="mb-2">
-                    <div className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-wider truncate mb-1">
-                        {formatCatalogName(item.catalogName)}
-                    </div>
-                    <h3 className="text-sm font-bold text-[#3a3d31] leading-tight line-clamp-2 group-hover:text-[#434738] transition-colors">
-                        {item.name}
-                    </h3>
+                    <div className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-wider truncate mb-1">{formatCatalogName(item.catalogName)}</div>
+                    <h3 className="text-sm font-bold text-[#3a3d31] leading-tight line-clamp-2 group-hover:text-[#434738] transition-colors">{item.name}</h3>
                 </div>
-                
-                <p className="text-[11px] text-[#7c766d] leading-relaxed line-clamp-3 mb-3 flex-1">
-                    {item.description}
-                </p>
-
+                <p className="text-[11px] text-[#7c766d] leading-relaxed line-clamp-3 mb-3 flex-1">{item.description}</p>
                 <div className="pt-3 mt-auto border-t border-[#f5f5f5] flex items-center justify-between">
-                     <span className="text-[9px] font-medium text-[#b0a99f] uppercase tracking-widest group-hover:text-[#434738] transition-colors">
-                        View Details
-                     </span>
+                     <span className="text-[9px] font-medium text-[#b0a99f] uppercase tracking-widest group-hover:text-[#434738] transition-colors">View Details</span>
                      <svg className="w-3 h-3 text-[#b0a99f] group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </div>
             </div>
@@ -125,20 +118,26 @@ const ItemCard = memo(({ item, onClick }: { item: FurnitureItem, onClick: () => 
     );
 });
 
-const PDFViewerModal = ({ item, onClose }: { item: FurnitureItem | null, onClose: () => void }) => {
-    if (!item) return null;
-    const cleanName = encodeURIComponent(item.catalogName);
+// -- UPDATED: PDF Modal with Variant Selector --
+const PDFViewerModal = ({ group, onClose }: { group: FurnitureItem[] | null, onClose: () => void }) => {
+    if (!group || group.length === 0) return null;
+    
+    // Default to first variant
+    const [selectedVariant, setSelectedVariant] = useState<FurnitureItem>(group[0]);
+
+    const cleanName = encodeURIComponent(selectedVariant.catalogName);
     const baseUrl = `https://storage.googleapis.com/norhaus_catalogues/${cleanName}`;
-    const pageNum = item.pageNumber;
+    const pageNum = selectedVariant.pageNumber;
     const deepLinkUrl = pageNum ? `${baseUrl}#page=${pageNum}` : baseUrl;
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
-            <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-[#e8e4dc] shadow-md">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-[#e8e4dc] shadow-md z-10 relative">
                 <div className="flex flex-col">
-                    <h3 className="text-sm font-bold text-[#3a3d31]">{item.name}</h3>
+                    <h3 className="text-sm font-bold text-[#3a3d31]">{selectedVariant.name}</h3>
                     <p className="text-[10px] text-[#b0a99f] uppercase tracking-wider">
-                        {formatCatalogName(item.catalogName)} • Page {pageNum || '1'}
+                        {formatCatalogName(selectedVariant.catalogName)} • Page {pageNum || '1'}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -146,18 +145,39 @@ const PDFViewerModal = ({ item, onClose }: { item: FurnitureItem | null, onClose
                         <span>Open PDF</span>
                         <ExternalLinkIcon />
                     </a>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-red-500 transition-colors">
-                        <CloseIcon />
-                    </button>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-red-500 transition-colors"><CloseIcon /></button>
                 </div>
             </div>
-            <div className="flex-1 w-full bg-[#525659] relative p-4 flex justify-center">
-                <div className="w-full max-w-6xl h-full bg-white shadow-2xl rounded-sm overflow-hidden">
-                    <object key={deepLinkUrl} data={deepLinkUrl} type="application/pdf" className="w-full h-full block">
-                        <div className="flex items-center justify-center h-full text-slate-500">
-                            <p>Unable to display PDF. Please use the "Open PDF" button.</p>
+
+            <div className="flex-1 w-full relative flex overflow-hidden">
+                {/* Variant Sidebar (Only shows if > 1 item) */}
+                {group.length > 1 && (
+                    <div className="w-64 bg-[#1a1a1a] text-white flex-shrink-0 flex flex-col border-r border-white/10 overflow-y-auto">
+                        <div className="p-4 border-b border-white/10">
+                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Available Variants</h4>
                         </div>
-                    </object>
+                        {group.map((item, idx) => (
+                            <button 
+                                key={idx}
+                                onClick={() => setSelectedVariant(item)}
+                                className={`p-4 text-left border-b border-white/5 hover:bg-white/5 transition-colors ${selectedVariant === item ? 'bg-[#434738] border-l-4 border-l-white' : ''}`}
+                            >
+                                <div className="text-sm font-medium mb-1">Page {item.pageNumber}</div>
+                                <div className="text-[10px] text-gray-400 line-clamp-2 leading-tight">{item.description}</div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* PDF Viewer */}
+                <div className="flex-1 bg-[#525659] relative flex justify-center p-4">
+                     <div className="w-full h-full bg-white shadow-2xl rounded-sm overflow-hidden">
+                        <object key={deepLinkUrl} data={deepLinkUrl} type="application/pdf" className="w-full h-full block">
+                            <div className="flex items-center justify-center h-full text-slate-500">
+                                <p>Unable to display PDF. Please use the "Open PDF" button.</p>
+                            </div>
+                        </object>
+                    </div>
                 </div>
             </div>
         </div>
@@ -171,10 +191,7 @@ const App: React.FC = () => {
     const [results, setResults] = useState<FurnitureItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [thinkingLog, setThinkingLog] = useState('');
-    const [selectedItem, setSelectedItem] = useState<FurnitureItem | null>(null);
-
-    // --- NEW LOGIC: Calculate Unique Catalogs ---
-    const uniqueCatalogs = new Set(results.map(r => r.catalogName)).size;
+    const [selectedGroup, setSelectedGroup] = useState<FurnitureItem[] | null>(null);
 
     const handleSearch = useCallback(async (query: string, file: File | null) => {
         if (!query && !file) return;
@@ -193,11 +210,24 @@ const App: React.FC = () => {
         }
     }, []);
 
+    // --- LOGIC: Group Results ---
+    // Groups items that share the exact same Name and Catalog
+    const groupedResults = useMemo(() => {
+        const groups: { [key: string]: FurnitureItem[] } = {};
+        results.forEach(item => {
+            const key = `${item.catalogName}-${item.name}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(item);
+        });
+        return Object.values(groups);
+    }, [results]);
+
+    const uniqueCatalogs = new Set(results.map(r => r.catalogName)).size;
+
     return (
         <div className="min-h-screen flex flex-col bg-[#fcfbf9] text-[#3a3d31] font-sans">
-            {selectedItem && <PDFViewerModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
+            {selectedGroup && <PDFViewerModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />}
 
-            {/* Modern Header */}
             <header className="px-8 py-6 border-b border-[#f0ede6] bg-white/80 backdrop-blur sticky top-0 z-40">
                 <div className="max-w-[1920px] mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -206,9 +236,7 @@ const App: React.FC = () => {
                         <span className="mx-2 text-slate-300">/</span>
                         <span className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">Intelligence</span>
                     </div>
-                    <div className="text-[10px] font-bold text-[#b0a99f] uppercase tracking-widest">
-                        Engine: Vercel Pro
-                    </div>
+                    <div className="text-[10px] font-bold text-[#b0a99f] uppercase tracking-widest">Engine: Vercel Pro</div>
                 </div>
             </header>
 
@@ -225,16 +253,15 @@ const App: React.FC = () => {
                         </div>
                     ) : results.length > 0 ? (
                         <div className="animate-fade-up">
-                            {/* --- NEW HEADER DISPLAY --- */}
                             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#f0ede6]">
                                 <h2 className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">
-                                    {results.length} Matches Found <span className="text-slate-300 mx-2">•</span> From {uniqueCatalogs} Catalogs
+                                    {results.length} Matches • {groupedResults.length} Unique Products • {uniqueCatalogs} Catalogs
                                 </h2>
                             </div>
                             
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                                {results.map((item, idx) => (
-                                    <ItemCard key={idx} item={item} onClick={() => setSelectedItem(item)} />
+                                {groupedResults.map((group, idx) => (
+                                    <ItemCard key={idx} group={group} onClick={() => setSelectedGroup(group)} />
                                 ))}
                             </div>
 
