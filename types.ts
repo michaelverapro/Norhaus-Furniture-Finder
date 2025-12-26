@@ -1,4 +1,3 @@
-
 export interface Catalog {
   id: string;
   name: string;
@@ -8,16 +7,24 @@ export interface Catalog {
 }
 
 export interface FurnitureItem {
-  id: string;
+  // Core fields used by App.tsx
   name: string;
   description: string;
-  pageNumber: number;
-  catalogId: string;
   catalogName: string;
-  category: string;
-  color: string;
+  
+  // Updated to allow string (AI often returns "5" as text) or number
+  pageNumber?: string | number; 
+  
+  // --- NEW FIELD (Fixes your error) ---
+  dimensions?: string; 
+
+  // Optional fields from your legacy code (kept to prevent other errors)
+  id?: string;
+  catalogId?: string;
+  category?: string;
+  color?: string;
   priceEstimate?: string;
-  visualSummary: string;
+  visualSummary?: string;
 }
 
 export interface SearchResult {
