@@ -55,7 +55,7 @@ const SearchInput = memo(({ onSearch, isSearching }: { onSearch: (q: string, f: 
                 <div className="flex items-center gap-2 pr-2">
                     <button onClick={() => fileInputRef.current?.click()} className="p-3 text-[#b0a99f] hover:text-[#434738] hover:bg-slate-50 transition-all rounded-full"><PaperclipIcon /></button>
                     <button onClick={handleTrigger} disabled={isSearching} className="bg-[#434738] hover:bg-[#33362a] text-white px-8 py-3 rounded-full text-xs font-bold tracking-widest uppercase transition-all shadow-md disabled:opacity-50">
-                        {isSearching ? '...' : 'Consult'}
+                        {isSearching ? '...' : 'Search Catalogues'}
                     </button>
                 </div>
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
@@ -233,8 +233,8 @@ const App: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-[#434738] rounded-full"></div>
                         <span className="text-lg font-bold tracking-tight uppercase">Norhaus</span>
-                        <span className="mx-2 text-slate-300">/</span>
-                        <span className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">Intelligence</span>
+                        <span className="mx-1 text-[#b0a99f]">-</span>
+                        <span className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">AI Powered Catalogue Search</span>
                     </div>
                     <div className="text-[10px] font-bold text-[#b0a99f] uppercase tracking-widest">Engine: Vercel Pro</div>
                 </div>
