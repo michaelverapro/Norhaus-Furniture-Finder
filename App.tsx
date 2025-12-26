@@ -18,8 +18,7 @@ const PaperclipIcon = () => <svg className="w-5 h-5" fill="none" stroke="current
 const CloseIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" /></svg>;
 const ExternalLinkIcon = () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>;
 const XCircleIcon = () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>;
-const FurnitureIcon = () => <svg className="w-10 h-10 text-[#434738] opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
-const LayersIcon = () => <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>;
+const SparklesIcon = () => <svg className="w-3 h-3 text-[#434738]" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1.323l3.954-1.582 1.605-3.192a1 1 0 011.838 0l1.605 3.192 3.954 1.582a1 1 0 010 1.838l-3.954 1.582-1.605 3.192a1 1 0 01-1.838 0l-1.605-3.192-3.954-1.582a1 1 0 01-1-1V2z" /><path d="M5 10a1 1 0 011 1v1.323l3.954-1.582 1.605-3.192a1 1 0 011.838 0l1.605 3.192 3.954 1.582a1 1 0 010 1.838l-3.954 1.582-1.605 3.192a1 1 0 01-1.838 0l-1.605-3.192-3.954-1.582a1 1 0 01-1-1V10z" /></svg>;
 
 // ==========================================
 // 2. ISOLATED COMPONENTS
@@ -47,7 +46,7 @@ const SearchInput = memo(({ onSearch, isSearching }: { onSearch: (q: string, f: 
                 <div className="pl-6 text-[#b0a99f]"><SearchIcon /></div>
                 <input
                     type="text"
-                    placeholder="Search catalogs..."
+                    placeholder="Describe your ideal furniture..."
                     value={localQuery}
                     onChange={(e) => setLocalQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleTrigger()}
@@ -56,7 +55,7 @@ const SearchInput = memo(({ onSearch, isSearching }: { onSearch: (q: string, f: 
                 <div className="flex items-center gap-2 pr-2">
                     <button onClick={() => fileInputRef.current?.click()} className="p-3 text-[#b0a99f] hover:text-[#434738] hover:bg-slate-50 transition-all rounded-full"><PaperclipIcon /></button>
                     <button onClick={handleTrigger} disabled={isSearching} className="bg-[#434738] hover:bg-[#33362a] text-white px-8 py-3 rounded-full text-xs font-bold tracking-widest uppercase transition-all shadow-md disabled:opacity-50">
-                        {isSearching ? '...' : 'Search'}
+                        {isSearching ? '...' : 'Consult'}
                     </button>
                 </div>
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
@@ -72,49 +71,62 @@ const SearchInput = memo(({ onSearch, isSearching }: { onSearch: (q: string, f: 
     );
 });
 
-// -- UPDATED: ItemCard with Prominent Variants --
+// -- NEW CARD DESIGN: The "Consultant Spec Sheet" --
 const ItemCard = memo(({ group, onClick }: { group: FurnitureItem[], onClick: () => void }) => {
-    // Primary item is the first one found
     const item = group[0];
     const variantCount = group.length;
 
     return (
-        <div onClick={onClick} className="bg-white rounded-lg border border-[#f0ede6] overflow-hidden cursor-pointer hover:shadow-xl hover:border-[#d6d3cc] transition-all duration-300 group flex flex-col h-full relative">
+        <div onClick={onClick} className="bg-white rounded-sm border border-[#e8e4dc] hover:border-[#434738] overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 flex flex-col h-full relative group">
             
-            {/* Taller Image Area for 4-Col Layout */}
-            <div className="h-48 bg-[#faf9f6] relative flex items-center justify-center border-b border-[#f0ede6] group-hover:bg-[#f0ede6] transition-colors">
-                <FurnitureIcon />
-                
-                {item.dimensions && (
-                    <div className="absolute top-3 left-3 bg-white/90 backdrop-blur border border-[#e8e4dc] text-[#434738] text-[9px] font-bold px-2 py-0.5 rounded shadow-sm">
-                        {item.dimensions}
-                    </div>
-                )}
-                
-                {/* --- NEW: High-Priority Variant Badge --- */}
-                {variantCount > 1 ? (
-                    <div className="absolute bottom-3 right-3 bg-[#434738] text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-md flex items-center gap-1.5 ring-2 ring-white animate-pulse-slow">
-                        <LayersIcon />
-                        <span className="uppercase tracking-wider">{variantCount} Variants</span>
-                    </div>
-                ) : (
-                    <div className="absolute bottom-3 right-3 bg-white text-[#434738] border border-[#e8e4dc] text-[10px] font-bold px-2 py-1 rounded shadow-sm opacity-60">
-                        Pg {item.pageNumber || '?'}
-                    </div>
-                )}
+            {/* 1. Header: Catalog & Variants */}
+            <div className="px-5 pt-5 pb-3 flex items-start justify-between border-b border-[#f5f5f5]">
+                 <div className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-wider truncate max-w-[120px]">
+                    {formatCatalogName(item.catalogName)}
+                 </div>
+                 {variantCount > 1 ? (
+                    <span className="text-[9px] font-bold text-[#434738] bg-[#f0ede6] px-2 py-0.5 rounded-sm">
+                        +{variantCount - 1} Options
+                    </span>
+                 ) : (
+                    <span className="text-[9px] font-bold text-[#b0a99f] bg-[#fcfbf9] px-2 py-0.5 rounded-sm">
+                        Pg {item.pageNumber}
+                    </span>
+                 )}
             </div>
 
-            <div className="p-5 flex flex-col flex-1">
-                <div className="mb-3">
-                    <div className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-wider truncate mb-1">{formatCatalogName(item.catalogName)}</div>
-                    <h3 className="text-lg font-bold text-[#3a3d31] leading-tight line-clamp-2 group-hover:text-[#434738] transition-colors">{item.name}</h3>
+            {/* 2. AI Insight (The "Why") - Highlighted */}
+            <div className="px-5 py-4 bg-[#fcfbf9] border-b border-[#f5f5f5] min-h-[80px]">
+                <div className="flex items-center gap-2 mb-2 opacity-60">
+                    <SparklesIcon />
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-[#434738]">Match Analysis</span>
                 </div>
-                <p className="text-[12px] text-[#7c766d] leading-relaxed line-clamp-3 mb-4 flex-1">{item.description}</p>
+                <p className="text-xs font-medium text-[#434738] italic leading-relaxed">
+                    "{item.matchReason || "Matches your search criteria."}"
+                </p>
+            </div>
+
+            {/* 3. Product Details */}
+            <div className="p-5 flex flex-col flex-1">
+                <h3 className="text-lg font-bold serif text-[#3a3d31] mb-2 leading-tight group-hover:text-[#434738] transition-colors">
+                    {item.name}
+                </h3>
+                
+                {item.dimensions && (
+                     <p className="text-[10px] font-mono text-[#b0a99f] mb-3">
+                        Dimensions: {item.dimensions}
+                     </p>
+                )}
+
+                <p className="text-[11px] text-[#7c766d] leading-relaxed line-clamp-3 mb-4 flex-1">
+                    {item.description}
+                </p>
+                
                 <div className="pt-4 mt-auto border-t border-[#f5f5f5] flex items-center justify-between">
-                     <span className="text-[10px] font-medium text-[#b0a99f] uppercase tracking-widest group-hover:text-[#434738] transition-colors">
-                        {variantCount > 1 ? 'View Collection' : 'View Details'}
+                     <span className="text-[9px] font-bold text-[#b0a99f] uppercase tracking-widest group-hover:text-[#434738] transition-colors">
+                        View Spec Sheet
                      </span>
-                     <svg className="w-4 h-4 text-[#b0a99f] group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                     <svg className="w-3 h-3 text-[#b0a99f] group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                 </div>
             </div>
         </div>
@@ -123,9 +135,7 @@ const ItemCard = memo(({ group, onClick }: { group: FurnitureItem[], onClick: ()
 
 const PDFViewerModal = ({ group, onClose }: { group: FurnitureItem[] | null, onClose: () => void }) => {
     if (!group || group.length === 0) return null;
-    
     const [selectedVariant, setSelectedVariant] = useState<FurnitureItem>(group[0]);
-
     const cleanName = encodeURIComponent(selectedVariant.catalogName);
     const baseUrl = `https://storage.googleapis.com/norhaus_catalogues/${cleanName}`;
     const pageNum = selectedVariant.pageNumber;
@@ -133,7 +143,6 @@ const PDFViewerModal = ({ group, onClose }: { group: FurnitureItem[] | null, onC
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-[#e8e4dc] shadow-md z-10 relative">
                 <div className="flex flex-col">
                     <h3 className="text-sm font-bold text-[#3a3d31]">{selectedVariant.name}</h3>
@@ -149,21 +158,14 @@ const PDFViewerModal = ({ group, onClose }: { group: FurnitureItem[] | null, onC
                     <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-red-500 transition-colors"><CloseIcon /></button>
                 </div>
             </div>
-
             <div className="flex-1 w-full relative flex overflow-hidden">
-                {/* Variant Sidebar */}
                 {group.length > 1 && (
                     <div className="w-72 bg-[#1a1a1a] text-white flex-shrink-0 flex flex-col border-r border-white/10 overflow-y-auto">
                         <div className="p-5 border-b border-white/10 bg-[#222]">
                             <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#b0a99f] mb-1">Select Variant</h4>
-                            <p className="text-xs text-gray-500">{group.length} options available</p>
                         </div>
                         {group.map((item, idx) => (
-                            <button 
-                                key={idx}
-                                onClick={() => setSelectedVariant(item)}
-                                className={`p-4 text-left border-b border-white/5 hover:bg-white/5 transition-colors ${selectedVariant === item ? 'bg-[#434738] border-l-4 border-l-white' : 'border-l-4 border-l-transparent'}`}
-                            >
+                            <button key={idx} onClick={() => setSelectedVariant(item)} className={`p-4 text-left border-b border-white/5 hover:bg-white/5 transition-colors ${selectedVariant === item ? 'bg-[#434738] border-l-4 border-l-white' : ''}`}>
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="text-xs font-bold text-white">Option {idx + 1}</span>
                                     <span className="text-[9px] bg-black/30 px-1.5 py-0.5 rounded text-gray-400">Pg {item.pageNumber}</span>
@@ -173,14 +175,10 @@ const PDFViewerModal = ({ group, onClose }: { group: FurnitureItem[] | null, onC
                         ))}
                     </div>
                 )}
-
-                {/* PDF Viewer */}
                 <div className="flex-1 bg-[#525659] relative flex justify-center p-6">
                      <div className="w-full h-full bg-white shadow-2xl rounded-sm overflow-hidden border border-black/20">
                         <object key={deepLinkUrl} data={deepLinkUrl} type="application/pdf" className="w-full h-full block">
-                            <div className="flex items-center justify-center h-full text-slate-500">
-                                <p>Unable to display PDF. Please use the "Open PDF" button.</p>
-                            </div>
+                            <div className="flex items-center justify-center h-full text-slate-500"><p>Unable to display PDF. Please use the "Open PDF" button.</p></div>
                         </object>
                     </div>
                 </div>
@@ -215,7 +213,6 @@ const App: React.FC = () => {
         }
     }, []);
 
-    // Logic to Group Results by Name + Catalog
     const groupedResults = useMemo(() => {
         const groups: { [key: string]: FurnitureItem[] } = {};
         results.forEach(item => {
@@ -231,7 +228,6 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col bg-[#fcfbf9] text-[#3a3d31] font-sans">
             {selectedGroup && <PDFViewerModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />}
-
             <header className="px-8 py-6 border-b border-[#f0ede6] bg-white/80 backdrop-blur sticky top-0 z-40">
                 <div className="max-w-[1920px] mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -243,13 +239,11 @@ const App: React.FC = () => {
                     <div className="text-[10px] font-bold text-[#b0a99f] uppercase tracking-widest">Engine: Vercel Pro</div>
                 </div>
             </header>
-
             <main className="flex-1 max-w-[1920px] mx-auto w-full px-8 py-12 flex flex-col">
                 <div className="mb-16 text-center">
-                    <h1 className="text-4xl font-serif text-[#3a3d31] mb-8 animate-fade-up">Explore the archives.</h1>
+                    <h1 className="text-4xl font-serif text-[#3a3d31] mb-8 animate-fade-up">Find your inspiration.</h1>
                     <SearchInput onSearch={handleSearch} isSearching={isSearching} />
                 </div>
-
                 <div className="flex-1">
                     {isSearching ? (
                         <div className="text-center py-20 opacity-50 animate-pulse">
@@ -259,17 +253,14 @@ const App: React.FC = () => {
                         <div className="animate-fade-up">
                             <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#f0ede6]">
                                 <h2 className="text-xs font-bold uppercase tracking-widest text-[#b0a99f]">
-                                    {groupedResults.length} Products Found <span className="text-slate-300 mx-2">•</span> {results.length - groupedResults.length} Variants Hidden
+                                    {groupedResults.length} Products Found <span className="text-slate-300 mx-2">•</span> {uniqueCatalogs} Catalogs
                                 </h2>
                             </div>
-                            
-                            {/* UPDATED: 4-Column Layout (xl:grid-cols-4) instead of 5 */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                                 {groupedResults.map((group, idx) => (
                                     <ItemCard key={idx} group={group} onClick={() => setSelectedGroup(group)} />
                                 ))}
                             </div>
-
                             {thinkingLog && (
                                 <div className="mt-12 bg-white border border-[#f0ede6] p-4 rounded-lg">
                                     <p className="text-[10px] font-bold uppercase text-[#b0a99f] mb-2">Process Log</p>
