@@ -7,18 +7,17 @@ export interface Catalog {
 }
 
 export interface FurnitureItem {
-  // Core fields used by App.tsx
   name: string;
   description: string;
   catalogName: string;
-  
-  // Updated to allow string (AI often returns "5" as text) or number
   pageNumber?: string | number; 
-  
-  // --- NEW FIELD (Fixes your error) ---
   dimensions?: string; 
+  
+  // --- NEW FIELD ---
+  // This holds the AI's specific explanation of the match
+  matchReason?: string; 
 
-  // Optional fields from your legacy code (kept to prevent other errors)
+  // Optional legacy fields
   id?: string;
   catalogId?: string;
   category?: string;
