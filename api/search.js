@@ -1,7 +1,6 @@
 import { Storage } from '@google-cloud/storage';
 import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 
-// VERCEL PRO: Allow 5 minutes (300 seconds) for deep scanning
 export const config = {
   maxDuration: 300, 
 };
@@ -35,15 +34,12 @@ export default async function handler(req, res) {
 
     const { query } = req.body;
     
-    // 1. Get All Files
     const [files] = await storage.bucket(bucketName).getFiles();
     const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
 
     if (pdfs.length === 0) return res.status(200).json({ items: [], log: "Bucket is empty." });
 
     const allItems = [];
-    
-    // 2. Pro Tier Speed: Scan 15 catalogs simultaneously
     const BATCH_SIZE = 15;
     
     for (let i = 0; i < pdfs.length; i += BATCH_SIZE) {
@@ -51,18 +47,31 @@ export default async function handler(req, res) {
         
         const batchPromises = batch.map(async (file) => {
             try {
-                // STRICT PROMPT FOR 4-PART DATA
+                // --- NEW PROMPT LOGIC ---
                 const result = await model.generateContent({
                     contents: [{
                         role: 'user',
                         parts: [
                             { fileData: { fileUri: `gs://${bucketName}/${file.name}`, mimeType: 'application/pdf' } },
-                            { text: `Search for "${query}".
+                            { text: `You are an expert furniture consultant. The user is searching for: "${query}".
+                            
+                            Task: Find items in this catalog that match the user's request.
+                            
                             Rules:
-                            1. Output strictly valid JSON.
-                            2. Structure: { "items": [{ "name": "Exact Product Name", "description": "Visual description of the item", "page_number_digit": "Page Number" }] }
-                            3. "page_number_digit" must be a single number (e.g. "12").
-                            4. If NO matches, return { "items": [] }` }
+                            1. **match_reason**: For each item, write a short, persuasive sentence explaining WHY it fits the query. (e.g., "This sofa features the deep brown leather finish you requested.")
+                            2. **dimensions**: Extract dimensions if found (e.g. "80W x 40D").
+                            3. JSON Only.
+                            
+                            Schema:
+                            { "items": [{ 
+                                "name": "Product Name", 
+                                "description": "Standard catalog description", 
+                                "match_reason": "Your expert analysis of why this fits",
+                                "dimensions": "Dimensions or null",
+                                "page_number_digit": "Page Number" 
+                            }] }
+                            
+                            If NO matches, return { "items": [] }` }
                         ]
                     }]
                 });
@@ -75,7 +84,6 @@ export default async function handler(req, res) {
 
                 if (data.items && Array.isArray(data.items)) {
                     return data.items.map(item => {
-                        // Clean Page Number
                         let cleanPage = null;
                         let rawPage = item.page_number_digit || item.pageNumber;
                         if (rawPage) {
@@ -83,12 +91,13 @@ export default async function handler(req, res) {
                             if (match) cleanPage = match[0];
                         }
                         
-                        // Return the 4 Key Data Points
                         return { 
                             name: item.name,
                             description: item.description,
+                            matchReason: item.match_reason, // Capturing the AI insight
+                            dimensions: item.dimensions,
                             pageNumber: cleanPage, 
-                            catalogName: file.name // Added automatically by server
+                            catalogName: file.name 
                         };
                     });
                 }
@@ -107,7 +116,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ 
         items: allItems, 
-        thinkingProcess: `Pro Scan: Checked ${pdfs.length} catalogs in ${((Date.now() - startTime)/1000).toFixed(1)}s.` 
+        thinkingProcess: `Consultant Scan: Reviewed ${pdfs.length} catalogs in ${((Date.now() - startTime)/1000).toFixed(1)}s.` 
     });
 
   } catch (error) {
