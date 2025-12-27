@@ -5,37 +5,47 @@ const BUCKET_NAME = 'norhaus_catalogues';
 const INDEX_FILE = 'master_index.json';
 
 export default async function handler(req, res) {
-  const { q } = req.query;
+  // Use the modern WHATWG URL API to prevent security deprecation warnings
+  const fullUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}${req.url}`;
+  const { searchParams } = new URL(fullUrl);
+  const q = searchParams.get('q');
 
   if (!q) {
     return res.status(400).json({ error: 'Search term is required' });
   }
 
   try {
-    // 1. Fetch the consolidated index from Google Cloud
+    // 1. Fetch the consolidated Master Index from your Google Cloud bucket
     const file = storage.bucket(BUCKET_NAME).file(INDEX_FILE);
     const [content] = await file.download();
     const products = JSON.parse(content.toString());
 
-    // 2. Perform a multi-attribute "Smart Scan"
+    // 2. Perform an Intelligence Scan across the rich metadata
     const query = q.toLowerCase();
     const results = products.filter(item => {
-      return (
-        item.name.toLowerCase().includes(query) ||
+      // Check for matches in basic info
+      const basicMatch = 
+        item.name?.toLowerCase().includes(query) ||
         item.category?.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query) ||
+        item.description?.toLowerCase().includes(query);
+
+      // Check for matches in high-end attributes
+      const attributeMatch = 
         item.attributes?.style?.toLowerCase().includes(query) ||
-        // Scan the entire list of materials
         item.attributes?.materials?.some(m => m.toLowerCase().includes(query)) ||
-        // Scan the rich search tags we built in AI Studio
-        item.search_tags?.some(tag => tag.toLowerCase().includes(query))
-      );
+        item.attributes?.finish?.toLowerCase().includes(query);
+
+      // Check for matches in the rich search tags (synonyms/intent)
+      const tagMatch = item.search_tags?.some(tag => tag.toLowerCase().includes(query));
+
+      return basicMatch || attributeMatch || tagMatch;
     });
 
-    // 3. Return results with their coordinates for the PDF viewer
+    // 3. Return results with their cloud coordinates (Catalog & Page)
     return res.status(200).json({
       count: results.length,
-      results: results.slice(0, 15) // Limit to top 15 matches for speed
+      // Limits to top 15 matches for UI performance
+      results: results.slice(0, 15) 
     });
 
   } catch (error) {
