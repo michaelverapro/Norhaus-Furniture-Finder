@@ -146,7 +146,6 @@ export default function Page() {
             <div className="min-h-screen bg-[#F9F9F9] flex flex-col items-center justify-center p-4 font-sans">
                 <div className="w-full max-w-lg bg-white border border-[#E5E5E5] p-12 shadow-2xl text-center">
                     
-                    {/* LOGO ON LOCK SCREEN */}
                     <div className="w-24 h-24 mx-auto mb-8 flex items-center justify-center">
                         <img 
                             src="/logo.png" 
@@ -206,7 +205,10 @@ export default function Page() {
                     
                     <div className="h-8 w-[1px] bg-[#E5E5E5]"></div>
                     
-                    <span className="text-lg font-serif tracking-wide text-[#111111]">NORHAUS <span className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#888888] ml-2">Digital Atelier</span></span>
+                    {/* UPDATED: Top-Left App Label */}
+                    <span className="text-lg font-serif tracking-wide text-[#111111]">
+                        Norhaus — <span className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#888888] ml-1">AI-Powered Furniture Finder</span>
+                    </span>
                 </div>
                 
                 <div className="flex items-center gap-4">
@@ -220,9 +222,16 @@ export default function Page() {
             </header>
 
             <main className="max-w-[1600px] mx-auto px-8 py-12">
-                <div className="max-w-3xl mx-auto mb-16 text-center pt-8">
-                    <h1 className="text-5xl font-serif mb-6 text-[#111111] tracking-tight">The Collection</h1>
-                    <p className="text-sm font-sans uppercase tracking-[0.15em] text-[#888888] mb-12">Curated by Artificial Intelligence</p>
+                <div className="max-w-4xl mx-auto mb-16 text-center pt-8">
+                    
+                    {/* UPDATED: Main Headline */}
+                    <h1 className="text-5xl font-serif mb-6 text-[#111111] tracking-tight">Search the Norhaus Catalog Collection</h1>
+                    
+                    {/* UPDATED: Subtext */}
+                    <p className="text-sm font-serif text-[#666666] mb-12 leading-relaxed max-w-2xl mx-auto">
+                        Curated by Google’s newest Gemini AI. Describe what you’re looking for, 
+                        and Gemini will search across all of your catalogs simultaneously to present the best matching options.
+                    </p>
                     
                     {/* SEARCH INPUT AREA */}
                     <div className="bg-white border-b border-[#E5E5E5] hover:border-[#999999] transition-colors relative flex items-center pb-2">
