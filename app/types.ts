@@ -14,21 +14,12 @@ export interface FurnitureItem {
   page: number;
   keywords: string[];
   
-  // AI CURATION FIELDS
-  matchReason?: string; // Gemini 3's justification for this specific item
-  
-  // OPTIONAL: RELATIVE RELEVANCE
-  // Gemini 3 can now "score" its confidence for each match
-  relevanceScore?: number; 
+  // The reason why this item was picked (from the AI prompt)
+  matchReason?: string;
 }
 
 export interface SearchResult {
   items: FurnitureItem[];
-  
-  // GEMINI 3 REASONING FIELDS
-  thinkingProcess: string;  // The summarized logic shown to the user
-  thoughtSignature?: string; // The raw ID of the AI's internal reasoning chain
-  
-  // PERFORMANCE METADATA
-  executionTimeMs?: number;
+  // The summary text explaining the AI's logic
+  thinkingProcess: string;
 }
