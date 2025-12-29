@@ -2,9 +2,19 @@
 import { Storage } from '@google-cloud/storage';
 import { GoogleGenAI } from '@google/genai';
 
-const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-const storage = new Storage({ credentials });
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize GCS
+let storage;
+try {
+  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  storage = new Storage({ credentials });
+} catch (e) {
+  storage = new Storage();
+}
+
+// Initialize the Unified SDK
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY 
+});
 
 export default async function handler(req, res) {
   const protocol = req.headers['x-forwarded-proto'] || 'http';
@@ -17,45 +27,48 @@ export default async function handler(req, res) {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
     const [content] = await file.download();
 
-    // MIGRATION: Gemini 2.5 Flash (Stable, Free Tier Friendly)
+    // SWITCH TO GEMINI 2.5 FLASH (Stable & Free Tier Friendly)
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', 
+      model: 'gemini-2.5-flash',
       contents: [{
         role: 'user',
         parts: [{
-          text: `You are the Norhaus AI Curator. 
-                 Identify matches for: "${q}" 
-                 Using this catalog: ${content.toString()}
-                 
+          text: `You are the Norhaus AI Curator.
+                 User Request: "${q}"
+                 Catalog Data: ${content.toString()}
+
                  INSTRUCTIONS:
-                 1. Return the original "catalog" filename and "page" number exactly.
-                 2. Provide a "thinking" summary explaining your choice.
-                 3. Return ONLY a JSON object.
-                 
-                 Structure:
+                 1. Analyze the request against the catalog.
+                 2. Write a short "thinking" summary explaining your design choices.
+                 3. Select the best matching items.
+                 4. Return ONLY a JSON object with the exact keys below.
+
+                 JSON Structure:
                  {
-                   "thinking": "I selected these because...",
-                   "items": [ 
-                      { 
-                        "product_id": "...", 
-                        "name": "...", 
-                        "description": "...", 
-                        "catalog": "filename.pdf", 
+                   "thinking": "I selected these items because...",
+                   "items": [
+                      {
+                        "product_id": "...",
+                        "name": "...",
+                        "description": "...",
+                        "catalog": "filename.pdf",
                         "page": 10,
-                        "matchReason": "..." 
-                      } 
+                        "matchReason": "..."
+                      }
                    ]
                  }`
         }]
       }],
       config: {
-        // REMOVED: thinkingConfig (Gemini 3 only)
-        // ADDED: standard JSON enforcement
+        // Enforces strict JSON output (prevents parsing errors)
         responseMimeType: "application/json"
       }
     });
 
+    // Parse the response
     const rawText = response.text;
+    if (!rawText) throw new Error("Empty response from AI");
+    
     const cleanJson = rawText.replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
 
@@ -66,15 +79,18 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Gemini 2.5 Search Error:", error);
-    
-    // Graceful error handling for limits
+
+    // Friendly 429 Handling
     if (error.message.includes('429')) {
-         return res.status(429).json({ 
-             error: 'System Busy', 
-             details: 'The free AI tier is busy. Please try again in 1 minute.' 
-         });
+      return res.status(429).json({
+        error: 'System Busy',
+        details: 'The free AI tier is currently busy. Please try again in 30 seconds.'
+      });
     }
 
-    return res.status(500).json({ error: 'Search failed', details: error.message });
+    return res.status(500).json({ 
+      error: 'Search failed', 
+      details: error.message 
+    });
   }
 }
