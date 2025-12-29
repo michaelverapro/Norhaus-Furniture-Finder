@@ -27,9 +27,9 @@ export default async function handler(req, res) {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
     const [content] = await file.download();
 
-    // SWITCH TO GEMINI 2.5 FLASH (Stable & Free Tier Friendly)
+    // GEMINI 3 FLASH PREVIEW (Premium Reasoning)
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: [{
         role: 'user',
         parts: [{
@@ -38,14 +38,14 @@ export default async function handler(req, res) {
                  Catalog Data: ${content.toString()}
 
                  INSTRUCTIONS:
-                 1. Analyze the request against the catalog.
-                 2. Write a short "thinking" summary explaining your design choices.
-                 3. Select the best matching items.
-                 4. Return ONLY a JSON object with the exact keys below.
+                 1. Use your reasoning capabilities to analyze the style, materials, and fit.
+                 2. Select the best items.
+                 3. Return ONLY a JSON object with the exact keys below.
+                 4. CRITICAL: Preserve the exact "catalog" filename and "page" number.
 
                  JSON Structure:
                  {
-                   "thinking": "I selected these items because...",
+                   "thinking": "Your design logic summary...",
                    "items": [
                       {
                         "product_id": "...",
@@ -60,34 +60,28 @@ export default async function handler(req, res) {
         }]
       }],
       config: {
-        // Enforces strict JSON output (prevents parsing errors)
+        // NATIVE THINKING ENABLED
+        // This generates the deep reasoning tokens before the response
+        thinkingConfig: { includeThoughts: true }, 
         responseMimeType: "application/json"
       }
     });
 
-    // Parse the response
+    // Access the text property (Unified SDK syntax)
     const rawText = response.text;
-    if (!rawText) throw new Error("Empty response from AI");
+    
+    if (!rawText) throw new Error("Empty response from Gemini 3");
     
     const cleanJson = rawText.replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
 
     return res.status(200).json({
       items: data.items || data.results || [],
-      thinkingProcess: data.thinking || "Gemini 2.5 analysis complete."
+      thinkingProcess: data.thinking || "Gemini 3 reasoning complete."
     });
 
   } catch (error) {
-    console.error("Gemini 2.5 Search Error:", error);
-
-    // Friendly 429 Handling
-    if (error.message.includes('429')) {
-      return res.status(429).json({
-        error: 'System Busy',
-        details: 'The free AI tier is currently busy. Please try again in 30 seconds.'
-      });
-    }
-
+    console.error("Gemini 3 Search Error:", error);
     return res.status(500).json({ 
       error: 'Search failed', 
       details: error.message 
