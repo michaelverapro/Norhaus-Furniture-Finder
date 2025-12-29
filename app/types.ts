@@ -14,15 +14,21 @@ export interface FurnitureItem {
   page: number;
   keywords: string[];
   
-  // The AI-generated fields
-  matchReason?: string;
+  // AI CURATION FIELDS
+  matchReason?: string; // Gemini 3's justification for this specific item
   
-  // Legacy UI helpers (optional)
-  catalogName?: string; 
-  pageNumber?: number;
+  // OPTIONAL: RELATIVE RELEVANCE
+  // Gemini 3 can now "score" its confidence for each match
+  relevanceScore?: number; 
 }
 
 export interface SearchResult {
   items: FurnitureItem[];
-  thinkingProcess: string;
+  
+  // GEMINI 3 REASONING FIELDS
+  thinkingProcess: string;  // The summarized logic shown to the user
+  thoughtSignature?: string; // The raw ID of the AI's internal reasoning chain
+  
+  // PERFORMANCE METADATA
+  executionTimeMs?: number;
 }
