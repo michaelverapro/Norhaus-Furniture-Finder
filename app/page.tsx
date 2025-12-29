@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { FurnitureItem } from './types';
 import { searchFurniture } from './geminiService';
-import { Search, ChevronDown, ChevronUp, Sparkles, Loader2, ExternalLink, Copy, Check, BookOpen, Lock, ArrowRight } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Sparkles, Loader2, ExternalLink, Copy, Check, BookOpen, Lock, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // --- VISUAL ITEM CARD COMPONENT ---
 const ItemCard = ({ item, rank }: { item: FurnitureItem, rank: number }) => {
@@ -71,10 +71,19 @@ export default function Page() {
     const [showThinking, setShowThinking] = useState(true);
     const [copied, setCopied] = useState(false);
     const [query, setQuery] = useState('');
+    
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 25;
+
+    // Derived Logic
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = results.slice(indexOfFirstItem, indexOfLastItem);
+    const totalPages = Math.ceil(results.length / itemsPerPage);
 
     const handleLogin = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        // HARDCODED PASSWORD CHECK
         if (accessCode === 'Norhaus2026') {
             setIsAuthenticated(true);
             setAuthError(false);
@@ -90,6 +99,7 @@ export default function Page() {
         setResults([]);
         setThinking('');
         setShowThinking(true);
+        setCurrentPage(1); // Reset to page 1
         
         try {
             const res = await searchFurniture(query, 'Norhaus2026');
@@ -108,7 +118,13 @@ export default function Page() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // --- RENDER LOCK SCREEN (If not logged in) ---
+    const scrollToTop = () => {
+        // Smooth scroll back to top of results
+        const main = document.querySelector('main');
+        if (main) main.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // --- RENDER LOCK SCREEN ---
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-[#fcfbf9] flex flex-col items-center justify-center p-4">
@@ -117,7 +133,6 @@ export default function Page() {
                         <Lock className="w-8 h-8 text-white" />
                     </div>
                     
-                    {/* UPDATED HEADER AND TEXT */}
                     <h1 className="text-3xl font-serif font-bold text-[#3a3d31] mb-4 leading-tight">
                         Welcome to the Norhaus Furniture Finder!
                     </h1>
@@ -149,7 +164,7 @@ export default function Page() {
         );
     }
 
-    // --- RENDER MAIN APP (If logged in) ---
+    // --- RENDER MAIN APP ---
     return (
         <div className="min-h-screen bg-[#fcfbf9] text-[#3a3d31] font-sans">
             <header className="px-8 py-6 border-b bg-white flex justify-between items-center sticky top-0 z-50">
@@ -237,10 +252,62 @@ export default function Page() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10 pb-20">
-                    {results.map((item, idx) => (
-                        <ItemCard key={idx} item={item} rank={idx + 1} />
-                    ))}
+                {/* RESULTS AREA */}
+                <div className="pb-10">
+                    {results.length > 0 && (
+                       <p className="text-xs font-bold text-[#8a8d85] uppercase tracking-widest mb-6">
+                           Showing items {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, results.length)} of {results.length}
+                       </p>
+                    )}
+                    
+                    {/* The Grid of 25 Items */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
+                        {currentItems.map((item, idx) => (
+                            <ItemCard key={idx} item={item} rank={indexOfFirstItem + idx + 1} />
+                        ))}
+                    </div>
+
+                    {/* ARROW NAVIGATION */}
+                    {results.length > itemsPerPage && (
+                        <div className="mt-16 flex justify-center items-center gap-6">
+                            {/* Back Arrow Button */}
+                            <button
+                                onClick={() => {
+                                    setCurrentPage(prev => Math.max(prev - 1, 1));
+                                    scrollToTop();
+                                }}
+                                disabled={currentPage === 1}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all
+                                    ${currentPage === 1 
+                                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed' 
+                                        : 'bg-white border border-[#e8e4dc] text-[#434738] hover:bg-[#F4F1EA] hover:border-[#434738] shadow-sm'
+                                    }`}
+                            >
+                                <ChevronLeft className="w-4 h-4" /> Previous
+                            </button>
+                            
+                            {/* Page Indicator */}
+                            <span className="text-xs font-bold text-[#8a8d85] uppercase tracking-widest">
+                                Page {currentPage} / {totalPages}
+                            </span>
+                            
+                            {/* Forward Arrow Button */}
+                            <button
+                                onClick={() => {
+                                    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+                                    scrollToTop();
+                                }}
+                                disabled={currentPage === totalPages}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all
+                                    ${currentPage === totalPages 
+                                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed' 
+                                        : 'bg-white border border-[#e8e4dc] text-[#434738] hover:bg-[#F4F1EA] hover:border-[#434738] shadow-sm'
+                                    }`}
+                            >
+                                Next <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </main>
         </div>
