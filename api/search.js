@@ -1,6 +1,6 @@
 // api/search.js
 import { Storage } from '@google-cloud/storage';
-import { GoogleGenerativeAI } from "@google-cloud/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const storage = new Storage();
 const BUCKET_NAME = 'norhaus_catalogues';
