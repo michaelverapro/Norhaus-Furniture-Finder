@@ -16,10 +16,11 @@ const BUCKET_NAME = 'norhaus_catalogues';
 const INDEX_FILE = 'master_index.json';
 
 // 2. Initialize Gemini with STABLE v1 API configuration
+// This overrides the SDK default of v1beta
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
-  // Fixes DeprecationWarning: Uses WHATWG URL API instead of url.parse()
+  // Use WHATWG URL API to resolve the DeprecationWarning
   const protocol = req.headers['x-forwarded-proto'] || 'http';
   const fullUrl = new URL(req.url, `${protocol}://${req.headers.host}`);
   const q = fullUrl.searchParams.get('q');
@@ -32,10 +33,11 @@ export default async function handler(req, res) {
     const [content] = await file.download();
     const catalogData = content.toString();
 
-    // 3. Explicitly target the stable v1 API to avoid 404s
+    // 3. Force the use of the stable v1 endpoint
+    // "gemini-1.5-flash" is the canonical name supported in v1
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
-      apiVersion: "v1" // <--- CRITICAL FIX: Forces stable version over v1beta
+      apiVersion: "v1" // <--- CRITICAL FIX: Stops the 404 on v1beta
     });
 
     const prompt = `
@@ -51,7 +53,7 @@ export default async function handler(req, res) {
     const response = await result.response;
     const text = response.text();
 
-    // 4. Robust JSON Parsing (removes AI markdown wrappers)
+    // 4. Robust JSON Parsing
     const cleanJson = text.replace(/```json|```/g, "").trim();
     const aiData = JSON.parse(cleanJson);
 
