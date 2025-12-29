@@ -1,32 +1,30 @@
-// geminiService.ts - Fixed Import Path
-import { SearchResult } from "./types"; // <--- CHANGED from "../types" to "./types"
+// geminiService.ts
+import { SearchResult } from "./types";
 
 export const syncAndCacheLibrary = async () => {
-  // In the Cloud version, "Sync" just means confirming the server is reachable.
   return { cacheName: "cloud-mode", catalogMetadata: [] };
 };
 
 export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   try {
-    // We send the query to our new Vercel API
-    const response = await fetch('/api/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
+    // We use a GET request with a 'q' parameter to match the search.js logic
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
 
     if (!response.ok) {
-      throw new Error(`Server Error: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Server Error: ${response.statusText}`);
     }
 
     const data = await response.json();
+    
+    // We map 'data.results' from the API to 'items' for the Frontend
     return { 
-      items: data.items || [], 
-      thinkingProcess: data.thinkingProcess || "Search complete." 
+      items: data.results || [], 
+      thinkingProcess: data.count !== undefined ? `Successfully retrieved ${data.count} items.` : "Search complete." 
     };
 
   } catch (e: any) {
-    console.error(e);
+    console.error("Frontend Search Error:", e);
     return { 
       items: [], 
       thinkingProcess: `Connection Error: ${e.message}` 
