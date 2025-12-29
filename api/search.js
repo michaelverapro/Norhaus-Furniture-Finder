@@ -17,8 +17,9 @@ export default async function handler(req, res) {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
     const [content] = await file.download();
 
+    // MIGRATION: Gemini 2.5 Flash (Stable, Free Tier Friendly)
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash', 
       contents: [{
         role: 'user',
         parts: [{
@@ -26,13 +27,14 @@ export default async function handler(req, res) {
                  Identify matches for: "${q}" 
                  Using this catalog: ${content.toString()}
                  
-                 CRITICAL INSTRUCTION:
-                 Return a JSON object where "items" contains the EXACT original data from the catalog.
-                 Do not remove "catalog", "page", "dimensions", or "product_id".
+                 INSTRUCTIONS:
+                 1. Return the original "catalog" filename and "page" number exactly.
+                 2. Provide a "thinking" summary explaining your choice.
+                 3. Return ONLY a JSON object.
                  
                  Structure:
                  {
-                   "thinking": "Your design reasoning here...",
+                   "thinking": "I selected these because...",
                    "items": [ 
                       { 
                         "product_id": "...", 
@@ -40,14 +42,15 @@ export default async function handler(req, res) {
                         "description": "...", 
                         "catalog": "filename.pdf", 
                         "page": 10,
-                        "matchReason": "Why this fits..." 
+                        "matchReason": "..." 
                       } 
                    ]
                  }`
         }]
       }],
       config: {
-        thinkingConfig: { includeThoughts: true },
+        // REMOVED: thinkingConfig (Gemini 3 only)
+        // ADDED: standard JSON enforcement
         responseMimeType: "application/json"
       }
     });
@@ -58,11 +61,20 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       items: data.items || data.results || [],
-      thinkingProcess: data.thinking || "AI Reasoning complete."
+      thinkingProcess: data.thinking || "Gemini 2.5 analysis complete."
     });
 
   } catch (error) {
-    console.error("Gemini 3 Search Error:", error);
+    console.error("Gemini 2.5 Search Error:", error);
+    
+    // Graceful error handling for limits
+    if (error.message.includes('429')) {
+         return res.status(429).json({ 
+             error: 'System Busy', 
+             details: 'The free AI tier is busy. Please try again in 1 minute.' 
+         });
+    }
+
     return res.status(500).json({ error: 'Search failed', details: error.message });
   }
 }
