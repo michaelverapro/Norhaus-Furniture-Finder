@@ -22,10 +22,9 @@ export default async function handler(req, res) {
     });
   }
 
-  // 2. Parse Body (Switching from GET query params to POST body)
+  // 2. Parse Body
   const { q, image } = req.body || {};
 
-  // Allow search if EITHER text OR image is present
   if (!q && !image) {
     return res.status(400).json({ error: 'Search term or image is required' });
   }
@@ -68,14 +67,14 @@ export default async function handler(req, res) {
 
     // If image exists, add it to the payload
     if (image) {
-      // image comes in as "data:image/jpeg;base64,....."
-      // We need to strip the prefix to get just the base64 data
+      // Clean the base64 string
       const base64Data = image.split(',')[1];
       const mimeType = image.split(';')[0].split(':')[1];
 
       promptParts.push({
-        inline_data: {
-          mime_type: mimeType,
+        // FIX: Must use camelCase for the Node SDK
+        inlineData: {
+          mimeType: mimeType,
           data: base64Data
         }
       });
