@@ -2,6 +2,7 @@
 import { Storage } from '@google-cloud/storage';
 import { GoogleGenAI } from '@google/genai';
 
+// Initialize GCS
 let storage;
 try {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
@@ -10,9 +11,23 @@ try {
   storage = new Storage();
 }
 
+// Initialize AI
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default async function handler(req, res) {
+  // --- SECURITY CHECKPOINT ---
+  // We check the custom header sent from the frontend
+  const userCode = req.headers['x-access-code'];
+  
+  // STRICT MATCH: If the code isn't exactly "Norhaus2026", block the request.
+  if (userCode !== 'Norhaus2026') {
+    return res.status(401).json({ 
+      error: 'Unauthorized', 
+      details: 'Invalid Access Code. Please refresh and try again.' 
+    });
+  }
+  // ---------------------------
+
   const protocol = req.headers['x-forwarded-proto'] || 'http';
   const fullUrl = new URL(req.url, `${protocol}://${req.headers.host}`);
   const q = fullUrl.searchParams.get('q');
@@ -23,6 +38,7 @@ export default async function handler(req, res) {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
     const [content] = await file.download();
 
+    // GEMINI 3.0 FLASH PREVIEW
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{
@@ -48,7 +64,7 @@ export default async function handler(req, res) {
                         "description": "...",
                         "catalog": "filename.pdf",
                         "page": 10,
-                        "matchReason": "Briefly explain why this fits the user's specific request (e.g. 'Matches the velvet requirement and moody aesthetic')."
+                        "matchReason": "Briefly explain why this fits..."
                       }
                    ]
                  }`
