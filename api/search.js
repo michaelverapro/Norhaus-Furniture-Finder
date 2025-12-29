@@ -2,7 +2,6 @@
 import { Storage } from '@google-cloud/storage';
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize GCS
 let storage;
 try {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
@@ -11,63 +10,83 @@ try {
   storage = new Storage();
 }
 
-// Initialize AI
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default async function handler(req, res) {
-  // --- SECURITY CHECKPOINT ---
+  // 1. Security Check
   const userCode = req.headers['x-access-code'];
-  
   if (userCode !== 'Norhaus2026') {
     return res.status(401).json({ 
       error: 'Unauthorized', 
-      details: 'Invalid Access Code. Please refresh and try again.' 
+      details: 'Invalid Access Code.' 
     });
   }
-  // ---------------------------
 
-  const protocol = req.headers['x-forwarded-proto'] || 'http';
-  const fullUrl = new URL(req.url, `${protocol}://${req.headers.host}`);
-  const q = fullUrl.searchParams.get('q');
+  // 2. Parse Body (Switching from GET query params to POST body)
+  const { q, image } = req.body || {};
 
-  if (!q) return res.status(400).json({ error: 'Search term is required' });
+  // Allow search if EITHER text OR image is present
+  if (!q && !image) {
+    return res.status(400).json({ error: 'Search term or image is required' });
+  }
 
   try {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
     const [content] = await file.download();
 
-    // GEMINI 3.0 FLASH PREVIEW
+    // 3. Construct the Multimodal Request
+    const promptParts = [
+      {
+        text: `You are the Norhaus Design Concierge.
+               User Request: "${q || "Find items matching this image."}"
+               Catalog Data: ${content.toString()}
+
+               INSTRUCTIONS:
+               1. If an IMAGE is provided, analyze its style, material, shape, and "vibe". 
+                  Find items in the catalog that visually resemble the uploaded image.
+               2. If only TEXT is provided, search based on the text description.
+               3. SEARCH GOAL: Find 50 relevant items.
+               4. ORDER BY RELEVANCE: Visual matches should be top priority.
+               5. Return ONLY a JSON object.
+
+               JSON Structure:
+               {
+                 "thinking": "I analyzed the image and see a [describe image]...",
+                 "items": [
+                    {
+                      "product_id": "...",
+                      "name": "...",
+                      "description": "...",
+                      "catalog": "filename.pdf",
+                      "page": 10,
+                      "matchReason": "Visual Match: Similar curved arms and velvet texture..."
+                    }
+                 ]
+               }`
+      }
+    ];
+
+    // If image exists, add it to the payload
+    if (image) {
+      // image comes in as "data:image/jpeg;base64,....."
+      // We need to strip the prefix to get just the base64 data
+      const base64Data = image.split(',')[1];
+      const mimeType = image.split(';')[0].split(':')[1];
+
+      promptParts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      });
+    }
+
+    // 4. Call Gemini 3.0
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{
         role: 'user',
-        parts: [{
-          text: `You are the Norhaus Design Concierge.
-                 User Request: "${q}"
-                 Catalog Data: ${content.toString()}
-
-                 INSTRUCTIONS:
-                 1. Analyze the request against the catalog.
-                 2. SEARCH GOAL: Find 50 relevant items. Cast a wide net.
-                 3. If the user asks for a specific category (e.g. "sofas"), list as many valid options as possible up to 50.
-                 4. ORDER BY RELEVANCE: The best matches must be first.
-                 5. Return ONLY a JSON object.
-
-                 JSON Structure:
-                 {
-                   "thinking": "Your design reasoning...",
-                   "items": [
-                      {
-                        "product_id": "...",
-                        "name": "...",
-                        "description": "...",
-                        "catalog": "filename.pdf",
-                        "page": 10,
-                        "matchReason": "Brief explanation..."
-                      }
-                   ]
-                 }`
-        }]
+        parts: promptParts
       }],
       config: {
         thinkingConfig: { includeThoughts: true }, 
@@ -81,7 +100,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       items: data.items || data.results || [],
-      thinkingProcess: data.thinking || "Reasoning complete."
+      thinkingProcess: data.thinking || "Visual analysis complete."
     });
 
   } catch (error) {
