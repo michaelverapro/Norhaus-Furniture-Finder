@@ -355,8 +355,18 @@ export default function Page() {
                 </div>
             </main>
             
-            {/* --- ADDED GREEN BAR --- */}
-            <div className="w-full h-12 bg-[#434738]"></div>
+            {/* --- UPDATED FOOTER WITH THICKER GREEN BAR & LOGO OVERLAY --- */}
+            <footer className="w-full h-16 bg-[#434738] flex items-center px-10 relative z-10">
+                {/* Make sure you have uploaded 'logo2.png' to your public/ folder.
+                   Filters are added to invert the color to white/beige for contrast.
+                */}
+                <img 
+                    src="/logo2.png" 
+                    alt="Norhaus Footer Logo" 
+                    className="h-3/4 w-auto object-contain filter brightness-0 invert opacity-90"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+            </footer>
         </div>
     );
 }
