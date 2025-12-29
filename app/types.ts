@@ -13,9 +13,7 @@ export interface FurnitureItem {
   catalog: string;
   page: number;
   keywords: string[];
-  
-  // Added: The specific reason why the AI picked this item
-  matchReason: string; 
+  matchReason: string; // Ensure this line exists!
 }
 
 export interface SearchResult {
