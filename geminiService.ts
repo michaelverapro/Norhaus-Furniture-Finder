@@ -7,7 +7,6 @@ export const syncAndCacheLibrary = async () => {
 
 export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
   try {
-    // We use a GET request with a 'q' parameter to match the search.js logic
     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
 
     if (!response.ok) {
@@ -17,7 +16,6 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
 
     const data = await response.json();
     
-    // We map 'data.results' from the API to 'items' for the Frontend
     return { 
       items: data.results || [], 
       thinkingProcess: data.count !== undefined ? `Successfully retrieved ${data.count} items.` : "Search complete." 
