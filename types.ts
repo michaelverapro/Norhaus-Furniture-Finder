@@ -4,20 +4,22 @@ export interface FurnitureItem {
   name: string;
   category: string;
   description: string;
-  style: string[];      // Array to match master_index.json
-  materials: string[];  // Array to match master_index.json
+  style: string[];
+  materials: string[];
   finish: string;
   dimensions: {
     raw: string;
   };
-  catalog: string;      // Matches 'catalog' key in JSON
-  page: number;         // Matches 'page' key in JSON
-  keywords: string[];   // Matches 'keywords' key in JSON
+  catalog: string;
+  page: number;
+  keywords: string[];
   
-  // UI-Specific helper fields (mapped in App.tsx)
+  // The AI-generated fields
+  matchReason?: string;
+  
+  // Legacy UI helpers (optional)
   catalogName?: string; 
   pageNumber?: number;
-  matchReason?: string;
 }
 
 export interface SearchResult {
