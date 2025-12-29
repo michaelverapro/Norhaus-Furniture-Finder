@@ -354,6 +354,9 @@ export default function Page() {
                     )}
                 </div>
             </main>
+            
+            {/* --- ADDED GREEN BAR --- */}
+            <div className="w-full h-12 bg-[#434738]"></div>
         </div>
     );
 }
