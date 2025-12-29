@@ -1,6 +1,6 @@
 // api/search.js
 import { Storage } from '@google-cloud/storage';
-const { GoogleGenerativeAI } = require("@google-cloud/generative-ai");
+import { GoogleGenerativeAI } from "@google-cloud/generative-ai";
 
 const storage = new Storage();
 const BUCKET_NAME = 'norhaus_catalogues';
@@ -13,31 +13,32 @@ export default async function handler(req, res) {
   if (!q) return res.status(400).json({ error: 'Search term is required' });
 
   try {
-    // 1. Fetch the "Knowledge Base" (Your JSON Index)
+    // 1. Fetch the Knowledge Base from GCS
     const file = storage.bucket(BUCKET_NAME).file(INDEX_FILE);
     const [content] = await file.download();
     const catalogData = content.toString();
 
-    // 2. Initialize Gemini 1.5 Flash
+    // 2. Initialize Gemini 1.5 Flash with JSON output mode
     const model = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
         generationConfig: { responseMimeType: "application/json" }
     });
 
-    // 3. The "Curator" Prompt
+    // 3. The Curator Prompt
     const prompt = `
-      You are the Norhaus AI Concierge. Use the provided Furniture Catalog JSON to find the best matches for the user's request.
+      You are the Norhaus AI Interior Design Consultant. 
+      Analyze the user's request and find the best matches from the provided furniture catalog.
       
       User Request: "${q}"
       Catalog Data: ${catalogData}
 
       Instructions:
-      1. Analyze the user's intent (style, size, material, or use-case).
-      2. Select up to 10 relevant items.
-      3. For each item, provide a brief 'matchReason' explaining why it fits the request.
-      4. Return the data as a JSON object with a 'results' array containing the full original item objects plus the 'matchReason' field.
+      1. Interpret the user's intent (e.g., style, material, mood, or room type).
+      2. Select up to 10 products that best fit the request.
+      3. For each selected product, create a "matchReason" (a short, persuasive 1-sentence explanation of why it fits).
+      4. Return ONLY a JSON object with a "results" array. Each object in the array must be the EXACT original product data plus the "matchReason" field.
       
-      Example Output: { "results": [{...item, "matchReason": "This piece fits your small space requirement..."}, ...] }
+      Expected JSON structure: { "results": [ { ...originalData, "matchReason": "string" } ] }
     `;
 
     const result = await model.generateContent(prompt);
@@ -46,11 +47,14 @@ export default async function handler(req, res) {
     return res.status(200).json({
       count: aiResponse.results?.length || 0,
       results: aiResponse.results || [],
-      thinkingProcess: `Gemini analyzed your request for "${q}" against the full catalog.`
+      thinkingProcess: `The AI Consultant interpreted: "${q}"`
     });
 
   } catch (error) {
     console.error('AI Search Error:', error);
-    return res.status(500).json({ error: 'The AI Concierge is currently unavailable.' });
+    return res.status(500).json({ 
+      error: 'The AI Concierge is currently offline.',
+      details: error.message 
+    });
   }
 }
