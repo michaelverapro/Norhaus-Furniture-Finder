@@ -92,12 +92,17 @@ export default async function handler(req, res) {
 
     const rawText = response.text;
 
-    // --- FIX START: ROBUST JSON EXTRACTION ---
-    // Finds the actual JSON object and ignores any extra text Gemini adds at the end
+    // --- CRITICAL FIX: CLEAN THE JSON ---
+    // Finds the first '{' and the last '}' to ignore any extra text the AI adds
     const startIndex = rawText.indexOf('{');
     const endIndex = rawText.lastIndexOf('}') + 1;
+    
+    if (startIndex === -1 || endIndex === -1) {
+        throw new Error("No JSON found in response");
+    }
+
     const cleanJson = rawText.substring(startIndex, endIndex);
-    // --- FIX END -----------------------------
+    // ------------------------------------
 
     const data = JSON.parse(cleanJson);
 
