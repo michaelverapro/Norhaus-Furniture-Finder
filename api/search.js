@@ -2,73 +2,68 @@
 import { Storage } from '@google-cloud/storage';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 1. Safe Initialization of GCS
+// 1. Initialize GCS
 let storage;
 try {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
   storage = new Storage({ credentials });
 } catch (e) {
   console.error("GCS Credential Error:", e.message);
-  storage = new Storage(); // Fallback to default auth if JSON fails
+  storage = new Storage();
 }
 
 const BUCKET_NAME = 'norhaus_catalogues';
 const INDEX_FILE = 'master_index.json';
 
-// 2. Initialize Gemini with explicit stable model
+// 2. Initialize Gemini with STABLE v1 API configuration
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
-  // Use the modern URL API to fix the DeprecationWarning
-  const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
-  const q = searchParams.get('q');
+  // Fixes DeprecationWarning: Uses WHATWG URL API instead of url.parse()
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const fullUrl = new URL(req.url, `${protocol}://${req.headers.host}`);
+  const q = fullUrl.searchParams.get('q');
 
   if (!q) return res.status(400).json({ error: 'Search term is required' });
   if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: 'API Key Missing' });
 
   try {
-    // 3. Fetch Catalog Data from Google Cloud
     const file = storage.bucket(BUCKET_NAME).file(INDEX_FILE);
     const [content] = await file.download();
     const catalogData = content.toString();
 
-    // 4. Set up Gemini 1.5 Flash (STABLE)
-    // We use "gemini-1.5-flash" without beta prefixes for maximum stability
+    // 3. Explicitly target the stable v1 API to avoid 404s
     const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash" 
+      model: "gemini-1.5-flash",
+      apiVersion: "v1" // <--- CRITICAL FIX: Forces stable version over v1beta
     });
 
     const prompt = `
       You are the Norhaus AI Interior Design Curator. 
-      Use the following catalog data to find the best items for the user's request.
+      Use the provided furniture catalog to find matches for: "${q}"
+      Catalog: ${catalogData}
       
-      User Request: "${q}"
-      Catalog Data: ${catalogData}
-
-      Instructions:
-      1. Find up to 10 relevant matches.
-      2. For each, provide a "matchReason" explaining why it fits.
-      3. Return ONLY a valid JSON object with a "results" array.
-      
-      Example Format: { "results": [ { "name": "Item Name", "matchReason": "This fits because..." } ] }
+      Return ONLY a JSON object with a "results" array. 
+      Each result should include a "matchReason" explaining the selection.
     `;
 
     const result = await model.generateContent(prompt);
-    const textResponse = result.response.text();
-    
-    // Clean potential markdown from AI response
-    const jsonString = textResponse.replace(/```json|```/g, "").trim();
-    const aiData = JSON.parse(jsonString);
+    const response = await result.response;
+    const text = response.text();
+
+    // 4. Robust JSON Parsing (removes AI markdown wrappers)
+    const cleanJson = text.replace(/```json|```/g, "").trim();
+    const aiData = JSON.parse(cleanJson);
 
     return res.status(200).json({
       results: aiData.results || [],
-      thinkingProcess: `Curated selections for: "${q}"`
+      thinkingProcess: `AI Curator identified matches for: "${q}"`
     });
 
   } catch (error) {
-    console.error('Curator Error:', error);
+    console.error('Search Error:', error);
     return res.status(500).json({ 
-      error: 'AI Curator Connection Failed',
+      error: 'Search Failed',
       details: error.message 
     });
   }
