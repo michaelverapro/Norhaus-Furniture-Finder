@@ -13,13 +13,10 @@ export interface FurnitureItem {
   catalog: string;
   page: number;
   keywords: string[];
-  
-  // The reason why this item was picked (from the AI prompt)
   matchReason?: string;
 }
 
 export interface SearchResult {
   items: FurnitureItem[];
-  // The summary text explaining the AI's logic
   thinkingProcess: string;
 }
