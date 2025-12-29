@@ -31,7 +31,7 @@ const PaperclipIcon = () => <svg className="w-5 h-5" fill="none" stroke="current
 const CloseIcon = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 18L18 6M6 6l12 12" /></svg>;
 const ExternalLinkIcon = () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>;
 const XCircleIcon = () => <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>;
-const SparklesIcon = () => <svg className="w-3 h-3 text-[#434738]" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1.323l3.954-1.582 1.605-3.192a1 1 0 011.838 0l1.605 3.192 3.954 1.582a1 1 0 010 1.838l-3.954 1.582-1.605 3.192a1 1 0 01-1.838 0l-1.605-3.192-3.954-1.582a1 1 0 01-1-1V2z" /><path d="M5 10a1 1 0 011 1v1.323l3.954-1.582 1.605-3.192a1 1 0 011.838 0l1.605 3.192 3.954 1.582a1 1 0 010 1.838l-3.954 1.582-1.605 3.192a1 1 0 01-1.838 0l-1.605-3.192-3.954-1.582a1 1 0 01-1-1V10z" /></svg>;
+const SparklesIcon = () => <svg className="w-3 h-3 text-[#434738]" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1.323l3.954-1.582 1.605-3.192a1 1 0 011.838 0l1.605 3.192 3.954-1.582a1 1 0 010 1.838l-3.954 1.582-1.605 3.192a1 1 0 01-1.838 0l-1.605-3.192-3.954-1.582a1 1 0 01-1-1V2z" /><path d="M5 10a1 1 0 011 1v1.323l3.954-1.582 1.605-3.192a1 1 0 011.838 0l1.605 3.192 3.954 1.582a1 1 0 010 1.838l-3.954 1.582-1.605 3.192a1 1 0 01-1.838 0l-1.605-3.192-3.954-1.582a1 1 0 01-1-1V10z" /></svg>;
 const LayersIcon = () => <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>;
 
 // ==========================================
@@ -116,7 +116,7 @@ const ItemCard = memo(({ group, onClick }: { group: FurnitureItem[], onClick: ()
                     <span className="text-[9px] font-bold uppercase tracking-widest text-[#434738]">Style Profile</span>
                 </div>
                 <p className="text-xs font-medium text-[#434738] italic leading-relaxed">
-                    {item.style || "Premium Collection"}
+                    {item.style && item.style.length > 0 ? item.style[0] : "Premium Collection"}
                 </p>
             </div>
             <div className="p-5 flex flex-col flex-1">
@@ -186,12 +186,11 @@ const App: React.FC = () => {
             const res = await searchFurniture(query, file || undefined);
             
             // --- DATA MAPPING BRIDGE ---
-            // Maps your master_index.json keys to the keys the App expects
             const mappedItems = (res.items || []).map((item: any) => ({
                 ...item,
                 catalogName: item.catalog, 
                 pageNumber: item.page,
-                style: Array.isArray(item.style) ? item.style[0] : item.style
+                // Ensure style remains an array for the type check, but can be displayed as string if needed
             }));
 
             setResults(mappedItems);
