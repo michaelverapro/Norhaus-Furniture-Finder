@@ -1,4 +1,4 @@
-// types.ts
+// app/types.ts
 export interface FurnitureItem {
   product_id: string;
   name: string;
@@ -13,7 +13,9 @@ export interface FurnitureItem {
   catalog: string;
   page: number;
   keywords: string[];
-  matchReason?: string;
+  
+  // Added: The specific reason why the AI picked this item
+  matchReason: string; 
 }
 
 export interface SearchResult {
