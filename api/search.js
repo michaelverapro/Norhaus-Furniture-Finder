@@ -4,12 +4,18 @@ import { GoogleGenAI } from '@google/genai';
 
 const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
 const storage = new Storage({ credentials });
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// Unified SDK initialization
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY 
+});
 
 export default async function handler(req, res) {
   const protocol = req.headers['x-forwarded-proto'] || 'http';
   const fullUrl = new URL(req.url, `${protocol}://${req.headers.host}`);
   const q = fullUrl.searchParams.get('q');
+
+  if (!q) return res.status(400).json({ error: 'Search term is required' });
 
   try {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
@@ -32,19 +38,22 @@ export default async function handler(req, res) {
         }]
       }],
       config: {
+        // Fact: includeThoughts: true makes the reasoning summary accessible
         thinkingConfig: { includeThoughts: true },
         responseMimeType: "application/json"
       }
     });
 
-    const rawText = response.text;
-    // Strip potential markdown wrappers that prevent JSON parsing
+    // CRITICAL FACT: .text is a property in the new SDK, NOT a function
+    const rawText = response.text; 
+    
+    // Safety: Strip markdown wrappers before parsing
     const cleanJson = rawText.replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
 
-    // Standardize the response so the frontend always sees "items"
+    // Standardize key names for the frontend
     return res.status(200).json({
-      items: data.items || data.results || [], 
+      items: data.items || data.results || [],
       thinkingProcess: data.thinking || "AI Reasoning complete."
     });
 
