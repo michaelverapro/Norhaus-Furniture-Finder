@@ -146,7 +146,7 @@ export default function Page() {
             <div className="min-h-screen bg-[#F9F9F9] flex flex-col items-center justify-center p-4 font-sans">
                 <div className="w-full max-w-lg bg-white border border-[#E5E5E5] p-12 shadow-2xl text-center">
                     
-                    <div className="w-24 h-24 mx-auto mb-8 flex items-center justify-center">
+                    <div className="w-24 h-24 mx-auto mb-6 flex items-center justify-center">
                         <img 
                             src="/logo.png" 
                             alt="Norhaus" 
@@ -161,11 +161,15 @@ export default function Page() {
                         </div>
                     </div>
                     
-                    <h1 className="text-3xl font-serif text-[#111111] mb-6 tracking-wide">NORHAUS CONCIERGE</h1>
+                    {/* UPDATED LOCK SCREEN TEXT */}
+                    <h1 className="text-3xl font-serif text-[#111111] mb-6 tracking-wide leading-tight">
+                        Welcome to the Norhaus Furniture Finder !
+                    </h1>
+                    
                     <div className="w-12 h-0.5 bg-[#111111] mx-auto mb-8"></div>
                     
-                    <p className="text-xs text-[#666666] mb-10 leading-7 px-6 tracking-wide font-serif italic">
-                        "Powered by Gemini 3.0. Intelligence meets Curation."
+                    <p className="text-sm text-[#666666] mb-10 leading-7 px-4 font-serif text-justify">
+                        This App is powered by the latest version of Gemini, and will intelligently search all catalogues, and provide insights, and recommendations based on what you search for. Please enter the access code below to access the App.
                     </p>
                     
                     <form onSubmit={handleLogin} className="flex flex-col gap-5 max-w-xs mx-auto">
@@ -205,7 +209,6 @@ export default function Page() {
                     
                     <div className="h-8 w-[1px] bg-[#E5E5E5]"></div>
                     
-                    {/* UPDATED: Top-Left App Label */}
                     <span className="text-lg font-serif tracking-wide text-[#111111]">
                         Norhaus — <span className="font-sans text-[10px] uppercase tracking-[0.2em] text-[#888888] ml-1">AI-Powered Furniture Finder</span>
                     </span>
@@ -224,10 +227,8 @@ export default function Page() {
             <main className="max-w-[1600px] mx-auto px-8 py-12">
                 <div className="max-w-4xl mx-auto mb-16 text-center pt-8">
                     
-                    {/* UPDATED: Main Headline */}
                     <h1 className="text-5xl font-serif mb-6 text-[#111111] tracking-tight">Search the Norhaus Catalog Collection</h1>
                     
-                    {/* UPDATED: Subtext */}
                     <p className="text-sm font-serif text-[#666666] mb-12 leading-relaxed max-w-2xl mx-auto">
                         Curated by Google’s newest Gemini AI. Describe what you’re looking for, 
                         and Gemini will search across all of your catalogs simultaneously to present the best matching options.
@@ -280,10 +281,11 @@ export default function Page() {
                 {(isSearching || thinking) && (
                     <div className="max-w-3xl mx-auto mb-20 animate-in fade-in slide-in-from-top-4 duration-700">
                         <div className="bg-[#FAFAFA] border border-[#EAEAEA] p-8">
+                            {/* UPDATED AI SUMMARY HEADER */}
                             <div className="flex justify-between items-center cursor-pointer mb-6 border-b border-[#EAEAEA] pb-4" onClick={() => setShowThinking(!showThinking)}>
-                                <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#666666]">
+                                <div className="flex items-center gap-3 text-[12px] font-bold tracking-[0.15em] text-[#666666]">
                                     <Sparkles className="w-3 h-3 text-[#111111]" />
-                                    {isSearching ? "ANALYZING CATALOG..." : "CURATORIAL NOTES"}
+                                    {isSearching ? "ANALYZING CATALOG..." : "Gemini's AI Assessment"}
                                 </div>
                                 <div className="flex items-center gap-4">
                                     {!isSearching && thinking && (
