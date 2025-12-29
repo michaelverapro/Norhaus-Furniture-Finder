@@ -9,7 +9,7 @@ import { Search, ChevronDown, ChevronUp, Sparkles, Loader2, ExternalLink, Copy, 
 const ItemCard = ({ item }: { item: FurnitureItem }) => {
     const initials = item.name.substring(0, 2).toUpperCase();
     
-    // Dynamic PDF Link Construction
+    // Construct the direct PDF link (Public GCS Bucket URL)
     const pdfUrl = item.catalog 
         ? `https://storage.googleapis.com/norhaus_catalogues/${item.catalog}#page=${item.page || 1}`
         : '#';
@@ -24,7 +24,7 @@ const ItemCard = ({ item }: { item: FurnitureItem }) => {
             <div className="h-40 relative flex items-center justify-center bg-[#F4F1EA] group-hover:bg-[#EFEDE6] transition-colors">
                 <span className="text-5xl font-serif text-[#434738] opacity-10">{initials}</span>
                 
-                {/* PDF Icon Badge */}
+                {/* PDF Badge */}
                 <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white p-1.5 rounded-full shadow-sm">
                     <ExternalLink className="w-3 h-3 text-[#434738]" />
                 </div>
@@ -66,8 +66,8 @@ export default function Page() {
             setResults(res.items || []);
             setThinking(res.thinkingProcess || '');
         } catch (e) { 
-            console.error(e);
-            setThinking("The AI service is currently busy. Please try again in a moment.");
+            console.error(e); 
+            setThinking("Search failed. Please try again.");
         }
         setIsSearching(false);
     };
@@ -83,8 +83,8 @@ export default function Page() {
             <header className="px-8 py-6 border-b bg-white flex justify-between items-center sticky top-0 z-50">
                 <div className="flex items-center gap-3">
                     <div className="w-3 h-3 bg-[#434738] rounded-full"></div>
-                    {/* Updated Badge for 2.5 */}
-                    <span className="text-lg font-bold uppercase tracking-tighter">Norhaus AI <span className="text-[8px] bg-slate-200 text-slate-600 px-1 ml-1">v2.5</span></span>
+                    {/* Badge showing Gemini 3 Power */}
+                    <span className="text-lg font-bold uppercase tracking-tighter">Norhaus AI <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1 ml-1">G3 Preview</span></span>
                 </div>
             </header>
 
@@ -111,7 +111,7 @@ export default function Page() {
                     </div>
                 </div>
 
-                {/* Reasoning Block */}
+                {/* Gemini 3 Reasoning Block */}
                 {(isSearching || thinking) && (
                     <div className="max-w-2xl mx-auto mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
                         <div className="bg-[#F0EEE6] border border-[#E2DFD5] rounded-xl p-4 relative">
@@ -121,7 +121,7 @@ export default function Page() {
                             >
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#6B6658]">
                                     <Sparkles className="w-3 h-3" />
-                                    {isSearching ? "Gemini 2.5 is analyzing..." : "Curator's Logic"}
+                                    {isSearching ? "Gemini 3 is thinking..." : "AI Curator Reasoning"}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {!isSearching && thinking && (
@@ -144,7 +144,7 @@ export default function Page() {
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce"></div>
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:-.3s]"></div>
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:-.5s]"></div>
-                                            Scanning catalog pages...
+                                            Parsing catalog for stylistic matches...
                                         </div>
                                     ) : (
                                         thinking
