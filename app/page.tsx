@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { FurnitureItem } from './types';
 import { searchFurniture } from './geminiService';
-import { Search, ChevronDown, ChevronUp, Sparkles, Loader2, ExternalLink, Copy, Check, BookOpen, Lock, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Sparkles, Loader2, ExternalLink, Copy, Check, BookOpen, Lock, ArrowRight, ChevronLeft, ChevronRight, Camera, X } from 'lucide-react';
 
 // --- VISUAL ITEM CARD COMPONENT ---
 const ItemCard = ({ item, rank }: { item: FurnitureItem, rank: number }) => {
@@ -71,12 +71,12 @@ export default function Page() {
     const [showThinking, setShowThinking] = useState(true);
     const [copied, setCopied] = useState(false);
     const [query, setQuery] = useState('');
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 25;
-
-    // Derived Logic
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = results.slice(indexOfFirstItem, indexOfLastItem);
@@ -93,16 +93,33 @@ export default function Page() {
         }
     };
 
+    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSelectedImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const clearImage = () => {
+        setSelectedImage(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
     const handleSearch = async () => {
-        if (!query) return;
+        if (!query && !selectedImage) return; // Prevent empty search
         setIsSearching(true);
         setResults([]);
         setThinking('');
         setShowThinking(true);
-        setCurrentPage(1); // Reset to page 1
+        setCurrentPage(1);
         
         try {
-            const res = await searchFurniture(query, 'Norhaus2026');
+            // Send query AND image (if exists)
+            const res = await searchFurniture(query, 'Norhaus2026', selectedImage || undefined);
             setResults(res.items || []);
             setThinking(res.thinkingProcess || '');
         } catch (e: any) { 
@@ -119,7 +136,6 @@ export default function Page() {
     };
 
     const scrollToTop = () => {
-        // Smooth scroll back to top of results
         const main = document.querySelector('main');
         if (main) main.scrollIntoView({ behavior: 'smooth' });
     };
@@ -132,16 +148,12 @@ export default function Page() {
                     <div className="w-16 h-16 bg-[#434738] rounded-full mx-auto mb-6 flex items-center justify-center shadow-md">
                         <Lock className="w-8 h-8 text-white" />
                     </div>
-                    
-                    <h1 className="text-3xl font-serif font-bold text-[#3a3d31] mb-4 leading-tight">
-                        Welcome to the Norhaus Furniture Finder!
-                    </h1>
+                    <h1 className="text-3xl font-serif font-bold text-[#3a3d31] mb-4 leading-tight">Welcome to the Norhaus Furniture Finder!</h1>
                     <p className="text-sm text-[#6B6658] mb-8 leading-relaxed px-4">
                         This App is powered by the latest version of Gemini, and will intelligently search all catalogues, 
                         and provide insights, and recommendations based on what you search for. 
                         Please enter the access code below to access the App.
                     </p>
-                    
                     <form onSubmit={handleLogin} className="flex flex-col gap-4 max-w-sm mx-auto">
                         <input 
                             type="password" 
@@ -151,11 +163,7 @@ export default function Page() {
                             onChange={(e) => setAccessCode(e.target.value)}
                         />
                         {authError && <p className="text-xs text-red-500 font-bold">Incorrect code. Please try again.</p>}
-                        
-                        <button 
-                            type="submit"
-                            className="w-full bg-[#434738] text-white p-4 rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-[#2c3024] transition-colors flex items-center justify-center gap-2 shadow-sm"
-                        >
+                        <button type="submit" className="w-full bg-[#434738] text-white p-4 rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-[#2c3024] transition-colors flex items-center justify-center gap-2 shadow-sm">
                             Enter App <ArrowRight className="w-4 h-4" />
                         </button>
                     </form>
@@ -172,68 +180,93 @@ export default function Page() {
                     <div className="w-4 h-4 bg-[#434738] rounded-sm rotate-45"></div>
                     <span className="text-xl font-serif font-bold tracking-tight">Norhaus <span className="font-sans font-light text-slate-400">Design Concierge</span></span>
                 </div>
-                
                 <div className="flex items-center gap-3 bg-[#f8f9fa] border border-[#e9ecef] px-3 py-1.5 rounded-full">
                     <div className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#6c757d]">
-                        System Active • 14 Catalogs
-                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#6c757d]">System Active • 14 Catalogs</span>
                 </div>
             </header>
 
             <main className="max-w-[1400px] mx-auto p-8">
                 <div className="max-w-2xl mx-auto mb-12 text-center pt-8">
                     <h1 className="text-4xl font-serif mb-2 text-[#3a3d31]">What are we curating today?</h1>
-                    <p className="text-sm text-[#8a8d85] mb-8">Ask for styles, dimensions, or specific materials.</p>
+                    <p className="text-sm text-[#8a8d85] mb-8">Upload a photo or describe the style you need.</p>
                     
-                    <div className="flex items-center bg-white border border-[#e8e4dc] rounded-full p-2 shadow-sm focus-within:ring-1 ring-[#434738] focus-within:shadow-md transition-shadow">
-                        <Search className="ml-4 text-slate-300 w-5 h-5" />
-                        <input 
-                            type="text" 
-                            placeholder="e.g. A mid-century arm chair in walnut..." 
-                            className="flex-1 p-4 bg-transparent outline-none text-[#3a3d31] placeholder:text-slate-300"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        />
-                        <button 
-                            className="bg-[#434738] text-white px-8 py-4 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-[#2c3024] transition-colors"
-                            onClick={handleSearch}
-                            disabled={isSearching}
-                        >
-                            {isSearching ? <Loader2 className="animate-spin w-4 h-4" /> : 'Search'}
-                        </button>
+                    {/* SEARCH INPUT AREA */}
+                    <div className="bg-white border border-[#e8e4dc] rounded-[2rem] shadow-sm focus-within:ring-1 ring-[#434738] focus-within:shadow-md transition-shadow relative overflow-hidden">
+                        
+                        {/* Image Preview inside Search Bar */}
+                        {selectedImage && (
+                            <div className="px-4 pt-4 pb-0 flex">
+                                <div className="relative inline-block">
+                                    <img src={selectedImage} alt="Upload" className="h-20 w-auto rounded-lg border border-slate-200 shadow-sm" />
+                                    <button 
+                                        onClick={clearImage}
+                                        className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow border border-slate-200 hover:bg-red-50"
+                                    >
+                                        <X className="w-3 h-3 text-red-500" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex items-center p-2">
+                            <Search className="ml-4 text-slate-300 w-5 h-5 shrink-0" />
+                            <input 
+                                type="text" 
+                                placeholder={selectedImage ? "Add context (e.g. 'Find a cheaper version of this')" : "e.g. A mid-century arm chair in walnut..."}
+                                className="flex-1 p-4 bg-transparent outline-none text-[#3a3d31] placeholder:text-slate-300"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            />
+                            
+                            {/* Hidden File Input */}
+                            <input 
+                                type="file" 
+                                ref={fileInputRef}
+                                onChange={handleImageUpload}
+                                accept="image/*"
+                                className="hidden"
+                            />
+
+                            {/* Camera Icon Trigger */}
+                            <button 
+                                className="p-3 mr-2 text-[#6B6658] hover:bg-[#F4F1EA] rounded-full transition-colors"
+                                onClick={() => fileInputRef.current?.click()}
+                                title="Upload Image"
+                            >
+                                <Camera className="w-5 h-5" />
+                            </button>
+
+                            <button 
+                                className="bg-[#434738] text-white px-8 py-4 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-[#2c3024] transition-colors"
+                                onClick={handleSearch}
+                                disabled={isSearching}
+                            >
+                                {isSearching ? <Loader2 className="animate-spin w-4 h-4" /> : 'Search'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {(isSearching || thinking) && (
                     <div className="max-w-2xl mx-auto mb-16 animate-in fade-in slide-in-from-top-4 duration-500">
                         <div className="bg-[#F0EEE6] border border-[#E2DFD5] rounded-xl p-4 relative shadow-sm">
-                            <div 
-                                className="flex justify-between items-center cursor-pointer"
-                                onClick={() => setShowThinking(!showThinking)}
-                            >
+                            <div className="flex justify-between items-center cursor-pointer" onClick={() => setShowThinking(!showThinking)}>
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#6B6658]">
                                     <Sparkles className="w-3 h-3 text-amber-600" />
-                                    {isSearching ? "Curator is analyzing catalog..." : "Curator's Logic"}
+                                    {isSearching ? "Curator is analyzing..." : "Curator's Logic"}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {!isSearching && thinking && (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); copyThinking(); }}
-                                            className="p-1 hover:bg-white/50 rounded transition-colors"
-                                            title="Copy reasoning"
-                                        >
-                                            {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3 text-[#6B6658]" />}
-                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); copyThinking(); }} className="p-1 hover:bg-white/50 rounded transition-colors"><Copy className="w-3 h-3 text-[#6B6658]" /></button>
                                     )}
                                     {showThinking ? <ChevronUp className="w-4 h-4 text-[#6B6658]" /> : <ChevronDown className="w-4 h-4 text-[#6B6658]" />}
                                 </div>
                             </div>
-                            
                             {showThinking && (
                                 <div className="mt-4 text-xs leading-relaxed text-[#434738] border-t border-[#E2DFD5] pt-4 font-serif italic">
                                     {isSearching ? (
@@ -241,7 +274,7 @@ export default function Page() {
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce"></div>
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:-.3s]"></div>
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:-.5s]"></div>
-                                            Reviewing dimensions and finishes...
+                                            Analyzing visual attributes and catalog...
                                         </div>
                                     ) : (
                                         thinking
@@ -252,7 +285,6 @@ export default function Page() {
                     </div>
                 )}
 
-                {/* RESULTS AREA */}
                 <div className="pb-10">
                     {results.length > 0 && (
                        <p className="text-xs font-bold text-[#8a8d85] uppercase tracking-widest mb-6">
@@ -260,49 +292,26 @@ export default function Page() {
                        </p>
                     )}
                     
-                    {/* The Grid of 25 Items */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
                         {currentItems.map((item, idx) => (
                             <ItemCard key={idx} item={item} rank={indexOfFirstItem + idx + 1} />
                         ))}
                     </div>
 
-                    {/* ARROW NAVIGATION */}
                     {results.length > itemsPerPage && (
                         <div className="mt-16 flex justify-center items-center gap-6">
-                            {/* Back Arrow Button */}
                             <button
-                                onClick={() => {
-                                    setCurrentPage(prev => Math.max(prev - 1, 1));
-                                    scrollToTop();
-                                }}
+                                onClick={() => { setCurrentPage(prev => Math.max(prev - 1, 1)); scrollToTop(); }}
                                 disabled={currentPage === 1}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all
-                                    ${currentPage === 1 
-                                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed' 
-                                        : 'bg-white border border-[#e8e4dc] text-[#434738] hover:bg-[#F4F1EA] hover:border-[#434738] shadow-sm'
-                                    }`}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white border border-[#e8e4dc] text-[#434738] hover:bg-[#F4F1EA] hover:border-[#434738] shadow-sm'}`}
                             >
                                 <ChevronLeft className="w-4 h-4" /> Previous
                             </button>
-                            
-                            {/* Page Indicator */}
-                            <span className="text-xs font-bold text-[#8a8d85] uppercase tracking-widest">
-                                Page {currentPage} / {totalPages}
-                            </span>
-                            
-                            {/* Forward Arrow Button */}
+                            <span className="text-xs font-bold text-[#8a8d85] uppercase tracking-widest">Page {currentPage} / {totalPages}</span>
                             <button
-                                onClick={() => {
-                                    setCurrentPage(prev => Math.min(prev + 1, totalPages));
-                                    scrollToTop();
-                                }}
+                                onClick={() => { setCurrentPage(prev => Math.min(prev + 1, totalPages)); scrollToTop(); }}
                                 disabled={currentPage === totalPages}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all
-                                    ${currentPage === totalPages 
-                                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed' 
-                                        : 'bg-white border border-[#e8e4dc] text-[#434738] hover:bg-[#F4F1EA] hover:border-[#434738] shadow-sm'
-                                    }`}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${currentPage === totalPages ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white border border-[#e8e4dc] text-[#434738] hover:bg-[#F4F1EA] hover:border-[#434738] shadow-sm'}`}
                             >
                                 Next <ChevronRight className="w-4 h-4" />
                             </button>
