@@ -1,4 +1,3 @@
-// api/search.js
 import { Storage } from '@google-cloud/storage';
 import { GoogleGenAI } from '@google/genai';
 
@@ -67,12 +66,10 @@ export default async function handler(req, res) {
 
     // If image exists, add it to the payload
     if (image) {
-      // Clean the base64 string
       const base64Data = image.split(',')[1];
       const mimeType = image.split(';')[0].split(':')[1];
 
       promptParts.push({
-        // FIX: Must use camelCase for the Node SDK
         inlineData: {
           mimeType: mimeType,
           data: base64Data
@@ -94,7 +91,14 @@ export default async function handler(req, res) {
     });
 
     const rawText = response.text;
-    const cleanJson = rawText.replace(/```json|```/g, "").trim();
+
+    // --- FIX START: ROBUST JSON EXTRACTION ---
+    // Finds the actual JSON object and ignores any extra text Gemini adds at the end
+    const startIndex = rawText.indexOf('{');
+    const endIndex = rawText.lastIndexOf('}') + 1;
+    const cleanJson = rawText.substring(startIndex, endIndex);
+    // --- FIX END -----------------------------
+
     const data = JSON.parse(cleanJson);
 
     return res.status(200).json({
