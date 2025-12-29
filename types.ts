@@ -1,45 +1,26 @@
-export interface Catalog {
-  id: string;
-  name: string;
-  file?: File;
-  driveId?: string;
-  uploadDate: Date;
-}
-
+// types.ts
 export interface FurnitureItem {
+  product_id: string;
   name: string;
+  category: string;
   description: string;
-  catalogName: string;
-  pageNumber?: string | number; 
-  dimensions?: string; 
+  style: string[];      // Array to match master_index.json
+  materials: string[];  // Array to match master_index.json
+  finish: string;
+  dimensions: {
+    raw: string;
+  };
+  catalog: string;      // Matches 'catalog' key in JSON
+  page: number;         // Matches 'page' key in JSON
+  keywords: string[];   // Matches 'keywords' key in JSON
   
-  // --- NEW FIELD ---
-  // This holds the AI's specific explanation of the match
-  matchReason?: string; 
-
-  // Optional legacy fields
-  id?: string;
-  catalogId?: string;
-  category?: string;
-  color?: string;
-  priceEstimate?: string;
-  visualSummary?: string;
+  // UI-Specific helper fields (mapped in App.tsx)
+  catalogName?: string; 
+  pageNumber?: number;
+  matchReason?: string;
 }
 
 export interface SearchResult {
   items: FurnitureItem[];
-  thinkingProcess?: string;
-  isCached?: boolean;
-}
-
-export interface SyncStatus {
-  state: 'idle' | 'syncing' | 'ready' | 'error';
-  lastSync?: Date;
-  cacheName?: string;
-  error?: string;
-}
-
-export enum SearchMode {
-  TEXT = 'TEXT',
-  IMAGE = 'IMAGE'
+  thinkingProcess: string;
 }
