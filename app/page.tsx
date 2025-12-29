@@ -110,7 +110,7 @@ export default function Page() {
     };
 
     const handleSearch = async () => {
-        if (!query && !selectedImage) return; // Prevent empty search
+        if (!query && !selectedImage) return;
         setIsSearching(true);
         setResults([]);
         setThinking('');
@@ -118,7 +118,6 @@ export default function Page() {
         setCurrentPage(1);
         
         try {
-            // Send query AND image (if exists)
             const res = await searchFurniture(query, 'Norhaus2026', selectedImage || undefined);
             setResults(res.items || []);
             setThinking(res.thinkingProcess || '');
@@ -145,9 +144,24 @@ export default function Page() {
         return (
             <div className="min-h-screen bg-[#fcfbf9] flex flex-col items-center justify-center p-4">
                 <div className="w-full max-w-lg bg-white border border-[#e8e4dc] p-10 rounded-2xl shadow-xl text-center">
-                    <div className="w-16 h-16 bg-[#434738] rounded-full mx-auto mb-6 flex items-center justify-center shadow-md">
-                        <Lock className="w-8 h-8 text-white" />
+                    
+                    {/* LOGO ON LOCK SCREEN */}
+                    <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                        {/* Try to load logo, fallback to Lock icon if missing */}
+                        <img 
+                            src="/logo.png" 
+                            alt="Norhaus" 
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                        />
+                        <div className="hidden w-16 h-16 bg-[#434738] rounded-full flex items-center justify-center shadow-md">
+                            <Lock className="w-8 h-8 text-white" />
+                        </div>
                     </div>
+                    
                     <h1 className="text-3xl font-serif font-bold text-[#3a3d31] mb-4 leading-tight">Welcome to the Norhaus Furniture Finder!</h1>
                     <p className="text-sm text-[#6B6658] mb-8 leading-relaxed px-4">
                         This App is powered by the latest version of Gemini, and will intelligently search all catalogues, 
@@ -176,10 +190,24 @@ export default function Page() {
     return (
         <div className="min-h-screen bg-[#fcfbf9] text-[#3a3d31] font-sans">
             <header className="px-8 py-6 border-b bg-white flex justify-between items-center sticky top-0 z-50">
-                <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 bg-[#434738] rounded-sm rotate-45"></div>
+                <div className="flex items-center gap-4">
+                    {/* --- LOGO UPDATE START --- */}
+                    <img 
+                        src="/logo.png" 
+                        alt="Norhaus Logo" 
+                        className="h-10 w-auto object-contain"
+                        onError={(e) => {
+                            // If logo fails, fallback to the text square
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                    />
+                    <div className="hidden w-4 h-4 bg-[#434738] rounded-sm rotate-45"></div>
+                    {/* --- LOGO UPDATE END --- */}
+                    
                     <span className="text-xl font-serif font-bold tracking-tight">Norhaus <span className="font-sans font-light text-slate-400">Design Concierge</span></span>
                 </div>
+                
                 <div className="flex items-center gap-3 bg-[#f8f9fa] border border-[#e9ecef] px-3 py-1.5 rounded-full">
                     <div className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -197,7 +225,6 @@ export default function Page() {
                     {/* SEARCH INPUT AREA */}
                     <div className="bg-white border border-[#e8e4dc] rounded-[2rem] shadow-sm focus-within:ring-1 ring-[#434738] focus-within:shadow-md transition-shadow relative overflow-hidden">
                         
-                        {/* Image Preview inside Search Bar */}
                         {selectedImage && (
                             <div className="px-4 pt-4 pb-0 flex">
                                 <div className="relative inline-block">
@@ -223,7 +250,6 @@ export default function Page() {
                                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                             />
                             
-                            {/* Hidden File Input */}
                             <input 
                                 type="file" 
                                 ref={fileInputRef}
@@ -232,7 +258,6 @@ export default function Page() {
                                 className="hidden"
                             />
 
-                            {/* Camera Icon Trigger */}
                             <button 
                                 className="p-3 mr-2 text-[#6B6658] hover:bg-[#F4F1EA] rounded-full transition-colors"
                                 onClick={() => fileInputRef.current?.click()}
