@@ -1,3 +1,6 @@
+// app/page.tsx
+"use client";
+
 import React, { useState, useCallback, useMemo } from 'react';
 import { FurnitureItem } from './types';
 import { searchFurniture } from './geminiService';
@@ -32,7 +35,7 @@ const ItemCard = ({ item, onClick }: { item: FurnitureItem, onClick: () => void 
             <div className="p-5 flex flex-col flex-1">
                 <div className="flex items-start gap-2 mb-2">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-1.5"></div>
-                    <p className="text-[10px] font-bold text-[#434738] leading-tight italic">"{item.matchReason}"</p>
+                    <p className="text-[10px] font-bold text-[#434738] leading-tight italic">"{item.matchReason || 'Match found'}"</p>
                 </div>
                 <h3 className="text-lg font-bold serif mb-1">{item.name}</h3>
                 <p className="text-[11px] text-[#7c766d] line-clamp-2 mb-4">{item.description}</p>
@@ -45,7 +48,7 @@ const ItemCard = ({ item, onClick }: { item: FurnitureItem, onClick: () => void 
     );
 };
 
-const App: React.FC = () => {
+export default function Page() {
     const [results, setResults] = useState<FurnitureItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [query, setQuery] = useState('');
@@ -72,11 +75,11 @@ const App: React.FC = () => {
 
             <main className="max-w-[1400px] mx-auto p-8">
                 <div className="max-w-2xl mx-auto mb-16 text-center">
-                    <h1 className="text-4xl font-serif mb-6">What are you looking for?</h1>
+                    <h1 className="text-4xl font-serif mb-6">Interior Design Concierge</h1>
                     <div className="flex items-center bg-white border border-[#e8e4dc] rounded-full p-2 shadow-sm focus-within:border-[#434738] transition-all">
                         <input 
                             type="text" 
-                            placeholder="e.g. A warm wooden table for a small dining room..." 
+                            placeholder="Describe your vision..." 
                             className="flex-1 p-4 bg-transparent outline-none text-lg"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
@@ -87,7 +90,7 @@ const App: React.FC = () => {
                             onClick={handleSearch}
                             disabled={isSearching}
                         >
-                            {isSearching ? 'Curating...' : 'Find'}
+                            {isSearching ? 'Curating...' : 'Search'}
                         </button>
                     </div>
                 </div>
@@ -97,16 +100,10 @@ const App: React.FC = () => {
                         <ItemCard key={idx} item={item} onClick={() => setSelectedItem(item)} />
                     ))}
                 </div>
-
-                {!isSearching && results.length === 0 && (
-                    <div className="text-center py-20 opacity-20 italic">
-                        Our AI curator is ready to help you find the perfect piece.
-                    </div>
-                )}
             </main>
 
             {selectedItem && (
-                <div className="fixed inset-0 bg-black/90 z-[100] flex flex-col p-4 animate-in fade-in duration-300">
+                <div className="fixed inset-0 bg-black/90 z-[100] flex flex-col p-4">
                     <div className="flex justify-between items-center p-4 bg-white rounded-t-lg">
                         <h3 className="font-bold">{selectedItem.name}</h3>
                         <button onClick={() => setSelectedItem(null)} className="text-red-500 font-bold px-4">CLOSE</button>
@@ -116,12 +113,10 @@ const App: React.FC = () => {
                         type="application/pdf" 
                         className="w-full h-full rounded-b-lg"
                     >
-                        <div className="bg-white p-20 text-center">Preview unavailable. <a href={`https://storage.googleapis.com/norhaus_catalogues/${selectedItem.catalog}`} target="_blank" className="underline">Download PDF</a></div>
+                        <div className="bg-white p-20 text-center">Preview unavailable.</div>
                     </object>
                 </div>
             )}
         </div>
     );
-};
-
-export default App;
+}
