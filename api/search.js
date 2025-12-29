@@ -5,7 +5,7 @@ const BUCKET_NAME = 'norhaus_catalogues';
 const INDEX_FILE = 'master_index.json';
 
 export default async function handler(req, res) {
-  // Use the modern WHATWG URL API to prevent security deprecation warnings
+  // Use modern WHATWG URL API for security
   const fullUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}${req.url}`;
   const { searchParams } = new URL(fullUrl);
   const q = searchParams.get('q');
@@ -15,37 +15,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Fetch the consolidated Master Index from your Google Cloud bucket
     const file = storage.bucket(BUCKET_NAME).file(INDEX_FILE);
     const [content] = await file.download();
     const products = JSON.parse(content.toString());
 
-    // 2. Perform an Intelligence Scan across the rich metadata
     const query = q.toLowerCase();
     const results = products.filter(item => {
-      // Check for matches in basic info
+      // 1. Check basic text fields
       const basicMatch = 
         item.name?.toLowerCase().includes(query) ||
         item.category?.toLowerCase().includes(query) ||
         item.description?.toLowerCase().includes(query);
 
-      // Check for matches in high-end attributes
+      // 2. Check the "keywords" array (Updated from search_tags)
+      const keywordMatch = item.keywords?.some(k => k.toLowerCase().includes(query));
+
+      // 3. Check the "style" and "materials" arrays
       const attributeMatch = 
-        item.attributes?.style?.toLowerCase().includes(query) ||
-        item.attributes?.materials?.some(m => m.toLowerCase().includes(query)) ||
-        item.attributes?.finish?.toLowerCase().includes(query);
+        item.style?.some(s => s.toLowerCase().includes(query)) ||
+        item.materials?.some(m => m.toLowerCase().includes(query));
 
-      // Check for matches in the rich search tags (synonyms/intent)
-      const tagMatch = item.search_tags?.some(tag => tag.toLowerCase().includes(query));
-
-      return basicMatch || attributeMatch || tagMatch;
+      return basicMatch || keywordMatch || attributeMatch;
     });
 
-    // 3. Return results with their cloud coordinates (Catalog & Page)
     return res.status(200).json({
       count: results.length,
-      // Limits to top 15 matches for UI performance
-      results: results.slice(0, 15) 
+      results: results.slice(0, 15) // Top 15 matches
     });
 
   } catch (error) {
