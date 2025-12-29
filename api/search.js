@@ -4,11 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 
 const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
 const storage = new Storage({ credentials });
-
-// Unified SDK initialization
-const ai = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY 
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default async function handler(req, res) {
   const protocol = req.headers['x-forwarded-proto'] || 'http';
@@ -30,28 +26,36 @@ export default async function handler(req, res) {
                  Identify matches for: "${q}" 
                  Using this catalog: ${content.toString()}
                  
-                 Return ONLY a JSON object with this exact structure:
+                 CRITICAL INSTRUCTION:
+                 Return a JSON object where "items" contains the EXACT original data from the catalog.
+                 Do not remove "catalog", "page", "dimensions", or "product_id".
+                 
+                 Structure:
                  {
-                   "thinking": "Your design reasoning here",
-                   "items": [ { "product_id": "...", "name": "...", "description": "...", "matchReason": "..." } ]
+                   "thinking": "Your design reasoning here...",
+                   "items": [ 
+                      { 
+                        "product_id": "...", 
+                        "name": "...", 
+                        "description": "...", 
+                        "catalog": "filename.pdf", 
+                        "page": 10,
+                        "matchReason": "Why this fits..." 
+                      } 
+                   ]
                  }`
         }]
       }],
       config: {
-        // Fact: includeThoughts: true makes the reasoning summary accessible
         thinkingConfig: { includeThoughts: true },
         responseMimeType: "application/json"
       }
     });
 
-    // CRITICAL FACT: .text is a property in the new SDK, NOT a function
-    const rawText = response.text; 
-    
-    // Safety: Strip markdown wrappers before parsing
+    const rawText = response.text;
     const cleanJson = rawText.replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
 
-    // Standardize key names for the frontend
     return res.status(200).json({
       items: data.items || data.results || [],
       thinkingProcess: data.thinking || "AI Reasoning complete."
