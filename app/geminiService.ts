@@ -1,7 +1,6 @@
 // app/geminiService.ts
 import { SearchResult } from './types';
 
-// Updated to accept the accessCode as the second argument
 export async function searchFurniture(query: string, accessCode: string): Promise<SearchResult> {
   const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
     headers: {
