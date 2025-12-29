@@ -5,7 +5,7 @@ const BUCKET_NAME = 'norhaus_catalogues';
 const INDEX_FILE = 'master_index.json';
 
 export default async function handler(req, res) {
-  // Use modern WHATWG URL API for security
+  // Safe URL parsing
   const fullUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}${req.url}`;
   const { searchParams } = new URL(fullUrl);
   const q = searchParams.get('q');
@@ -27,10 +27,10 @@ export default async function handler(req, res) {
         item.category?.toLowerCase().includes(query) ||
         item.description?.toLowerCase().includes(query);
 
-      // 2. Check the "keywords" array (Updated from search_tags)
+      // 2. Check the NEW "keywords" array
       const keywordMatch = item.keywords?.some(k => k.toLowerCase().includes(query));
 
-      // 3. Check the "style" and "materials" arrays
+      // 3. Check the NEW "style" and "materials" arrays
       const attributeMatch = 
         item.style?.some(s => s.toLowerCase().includes(query)) ||
         item.materials?.some(m => m.toLowerCase().includes(query));
@@ -40,11 +40,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       count: results.length,
-      results: results.slice(0, 15) // Top 15 matches
+      results: results.slice(0, 20) 
     });
 
   } catch (error) {
     console.error('Search API Error:', error);
-    return res.status(500).json({ error: 'Failed to process furniture search' });
+    return res.status(500).json({ error: 'Failed to process search' });
   }
 }
