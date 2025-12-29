@@ -1,12 +1,9 @@
 // geminiService.ts
 import { SearchResult } from "./types";
 
-export const syncAndCacheLibrary = async () => {
-  return { cacheName: "cloud-mode", catalogMetadata: [] };
-};
-
-export const searchFurniture = async (query: string, imageFile?: File): Promise<SearchResult> => {
+export const searchFurniture = async (query: string): Promise<SearchResult> => {
   try {
+    // We send a simple GET request; the AI Brain handles everything on the server
     const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
 
     if (!response.ok) {
@@ -18,14 +15,19 @@ export const searchFurniture = async (query: string, imageFile?: File): Promise<
     
     return { 
       items: data.results || [], 
-      thinkingProcess: data.count !== undefined ? `Successfully retrieved ${data.count} items.` : "Search complete." 
+      thinkingProcess: data.thinkingProcess || "AI successfully curated these items for you." 
     };
 
   } catch (e: any) {
     console.error("Frontend Search Error:", e);
     return { 
       items: [], 
-      thinkingProcess: `Connection Error: ${e.message}` 
+      thinkingProcess: `Consultation Error: ${e.message}` 
     };
   }
+};
+
+// Placeholder to keep the app from breaking if other components call it
+export const syncAndCacheLibrary = async () => {
+  return { cacheName: "cloud-mode", catalogMetadata: [] };
 };
