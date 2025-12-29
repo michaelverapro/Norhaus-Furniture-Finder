@@ -13,7 +13,9 @@ export interface FurnitureItem {
   catalog: string;
   page: number;
   keywords: string[];
-  matchReason: string; // Ensure this line exists!
+  
+  // Ensure this field is present!
+  matchReason: string; 
 }
 
 export interface SearchResult {
