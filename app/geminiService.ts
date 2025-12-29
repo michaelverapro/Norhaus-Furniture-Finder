@@ -1,12 +1,18 @@
 // app/geminiService.ts
 import { SearchResult } from './types';
 
-export async function searchFurniture(query: string, accessCode: string): Promise<SearchResult> {
-  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+export async function searchFurniture(query: string, accessCode: string, imageBase64?: string): Promise<SearchResult> {
+  // We switch to POST to handle the large image data
+  const response = await fetch('/api/search', {
+    method: 'POST',
     headers: {
-      // Pass the code securely in the header
+      'Content-Type': 'application/json',
       'x-access-code': accessCode
-    }
+    },
+    body: JSON.stringify({ 
+      q: query,
+      image: imageBase64 // Optional image string
+    })
   });
   
   if (!response.ok) {
