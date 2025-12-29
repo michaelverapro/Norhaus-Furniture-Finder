@@ -2,23 +2,14 @@
 import { Storage } from '@google-cloud/storage';
 import { GoogleGenAI } from '@google/genai';
 
-// 1. Initialize GCS
-let storage;
-try {
-  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-  storage = new Storage({ credentials });
-} catch (e) {
-  storage = new Storage(); 
-}
+const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+const storage = new Storage({ credentials });
 
-// 2. Initialize the Verified Unified SDK
-// Fact: The client is instantiated using the GoogleGenAI class
 const ai = new GoogleGenAI({ 
   apiKey: process.env.GEMINI_API_KEY 
 });
 
 export default async function handler(req, res) {
-  // Fact: WHATWG URL API prevents the 'url.parse' security warning
   const protocol = req.headers['x-forwarded-proto'] || 'http';
   const fullUrl = new URL(req.url, `${protocol}://${req.headers.host}`);
   const q = fullUrl.searchParams.get('q');
@@ -29,7 +20,6 @@ export default async function handler(req, res) {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
     const [content] = await file.download();
 
-    // 3. Execution using Gemini 3 Flash Preview
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [{
@@ -42,15 +32,22 @@ export default async function handler(req, res) {
         }]
       }],
       config: {
-        // Fact: This enables the internal reasoning chain for Gemini 3
-        thinking: { include: true },
+        // Correct parameter for Gemini 3 thinking depth
+        thinkingConfig: { includeThoughts: true }, 
         responseMimeType: "application/json"
       }
     });
 
-    // Fact: response.text() is the standard helper in the new SDK
-    const text = response.text().replace(/```json|```/g, "").trim();
-    const data = JSON.parse(text);
+    // FACT: .text is a property, NOT a function. 
+    // Accessing it as .text() causes the TypeError.
+    const rawText = response.text; 
+    
+    if (!rawText) {
+        throw new Error("No text returned from Gemini 3");
+    }
+
+    const cleanJson = rawText.replace(/```json|```/g, "").trim();
+    const data = JSON.parse(cleanJson);
 
     return res.status(200).json({
       items: data.results || [],
@@ -59,6 +56,9 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Gemini 3 Search Error:", error);
-    return res.status(500).json({ error: 'Search failed', details: error.message });
+    return res.status(500).json({ 
+        error: 'Search failed', 
+        details: error.message 
+    });
   }
 }
