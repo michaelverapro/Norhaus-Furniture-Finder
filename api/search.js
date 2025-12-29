@@ -16,10 +16,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export default async function handler(req, res) {
   // --- SECURITY CHECKPOINT ---
-  // We check the custom header sent from the frontend
   const userCode = req.headers['x-access-code'];
   
-  // STRICT MATCH: If the code isn't exactly "Norhaus2026", block the request.
   if (userCode !== 'Norhaus2026') {
     return res.status(401).json({ 
       error: 'Unauthorized', 
@@ -50,9 +48,10 @@ export default async function handler(req, res) {
 
                  INSTRUCTIONS:
                  1. Analyze the request against the catalog.
-                 2. Select the best items.
-                 3. ORDER BY RELEVANCE: The best match must be first.
-                 4. Return ONLY a JSON object.
+                 2. SEARCH GOAL: Find 50 relevant items. Cast a wide net.
+                 3. If the user asks for a specific category (e.g. "sofas"), list as many valid options as possible up to 50.
+                 4. ORDER BY RELEVANCE: The best matches must be first.
+                 5. Return ONLY a JSON object.
 
                  JSON Structure:
                  {
@@ -64,7 +63,7 @@ export default async function handler(req, res) {
                         "description": "...",
                         "catalog": "filename.pdf",
                         "page": 10,
-                        "matchReason": "Briefly explain why this fits..."
+                        "matchReason": "Brief explanation..."
                       }
                    ]
                  }`
