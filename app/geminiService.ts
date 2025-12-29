@@ -1,8 +1,14 @@
 // app/geminiService.ts
 import { SearchResult } from './types';
 
-export async function searchFurniture(query: string): Promise<SearchResult> {
-  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+// Updated to accept the accessCode as the second argument
+export async function searchFurniture(query: string, accessCode: string): Promise<SearchResult> {
+  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+    headers: {
+      // Pass the code securely in the header
+      'x-access-code': accessCode
+    }
+  });
   
   if (!response.ok) {
     const errorData = await response.json();
@@ -11,7 +17,6 @@ export async function searchFurniture(query: string): Promise<SearchResult> {
   
   const data = await response.json();
   
-  // Return the structure expected by your Page component
   return {
     items: data.items || [],
     thinkingProcess: data.thinkingProcess || ""
