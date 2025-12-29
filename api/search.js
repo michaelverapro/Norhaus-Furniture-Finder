@@ -1,47 +1,54 @@
 // api/search.js
 import { Storage } from '@google-cloud/storage';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from '@google/genai';
 
 const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
 const storage = new Storage({ credentials });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Initialize the verified Unified SDK Client
+const client = createClient({ 
+  apiKey: process.env.GEMINI_API_KEY 
+});
 
 export default async function handler(req, res) {
-  const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
-  const q = searchParams.get('q');
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const fullUrl = new URL(req.url, `${protocol}://${req.headers.host}`);
+  const q = fullUrl.searchParams.get('q');
 
   try {
     const file = storage.bucket('norhaus_catalogues').file('master_index.json');
     const [content] = await file.download();
-    
-    // FORCING GEMINI 3 PREVIEW
-    const model = genAI.getGenerativeModel(
-      { model: "gemini-3-flash-preview" },
-      { apiVersion: "v1beta" }
-    );
 
-    const prompt = `
-      You are the Norhaus Curator. User wants: "${q}". 
-      Catalog Data: ${content.toString()}
+    // Fact: Gemini 3 models on the Unified SDK use this exact request structure
+    const response = await client.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `You are the Norhaus AI Curator. 
+                 User Request: "${q}"
+                 Catalog: ${content.toString()}
+                 
+                 Provide your response in JSON format with a "thinking" string and a "results" array.`
+        }]
+      }],
+      config: {
+        thinking: { include: true }, // Enables the Gemini 3 thinking process
+        responseMimeType: "application/json"
+      }
+    });
 
-      TASK:
-      1. Think about the style, materials, and vibe.
-      2. Select top 8 items.
-      3. Return a JSON object with:
-         - "thinking": A 2-sentence explanation of your interior design logic for this search.
-         - "results": The array of items + "matchReason" for each.
-    `;
-
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/```json|```/g, "").trim();
+    // Fact: The Unified SDK returns content in the 'response.text()' helper or nested parts
+    const text = response.text().replace(/```json|```/g, "").trim();
     const data = JSON.parse(text);
 
     return res.status(200).json({
       items: data.results || [],
-      thinkingProcess: data.thinking || "Matches selected based on catalog stylistic traits."
+      thinkingProcess: data.thinking || "AI Reasoning complete."
     });
 
   } catch (error) {
+    console.error("Gemini 3 Execution Error:", error);
     return res.status(500).json({ error: error.message });
   }
 }
