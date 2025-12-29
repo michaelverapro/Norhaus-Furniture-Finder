@@ -1,28 +1,49 @@
 // app/page.tsx
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { FurnitureItem } from './types';
 import { searchFurniture } from './geminiService';
-import { Search, ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Sparkles, Loader2, ExternalLink, Copy, Check } from 'lucide-react';
 
-const ItemCard = ({ item, onClick }: { item: FurnitureItem, onClick: () => void }) => {
+const ItemCard = ({ item }: { item: FurnitureItem }) => {
     const initials = item.name.substring(0, 2).toUpperCase();
+    
+    // Construct the direct PDF link (Public GCS Bucket URL)
+    // Format: https://storage.googleapis.com/[BUCKET]/[CATALOG]#page=[PAGE]
+    const pdfUrl = item.catalog 
+        ? `https://storage.googleapis.com/norhaus_catalogues/${item.catalog}#page=${item.page || 1}`
+        : '#';
+
     return (
-        <div onClick={onClick} className="bg-white border border-[#e8e4dc] hover:border-[#434738] cursor-pointer hover:shadow-xl transition-all flex flex-col h-full">
-            <div className="h-40 relative flex items-center justify-center bg-[#F4F1EA]">
+        <a 
+            href={pdfUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="group block bg-white border border-[#e8e4dc] hover:border-[#434738] hover:shadow-xl transition-all h-full relative"
+        >
+            <div className="h-40 relative flex items-center justify-center bg-[#F4F1EA] group-hover:bg-[#EFEDE6] transition-colors">
                 <span className="text-5xl font-serif text-[#434738] opacity-10">{initials}</span>
-                <div className="absolute top-3 left-3 text-[8px] font-bold uppercase tracking-widest bg-white/50 px-2 py-1">{item.catalog?.replace('.pdf', '')}</div>
+                
+                {/* PDF Badge */}
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-white p-1.5 rounded-full shadow-sm">
+                    <ExternalLink className="w-3 h-3 text-[#434738]" />
+                </div>
+
+                <div className="absolute bottom-3 left-3 text-[9px] font-bold uppercase tracking-widest bg-white/60 px-2 py-1 backdrop-blur-sm">
+                    {item.catalog?.replace('.pdf', '')} — Pg. {item.page}
+                </div>
             </div>
-            <div className="p-5 flex flex-col flex-1">
-                <div className="flex items-start gap-2 mb-2">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-1.5"></div>
+            
+            <div className="p-5 flex flex-col">
+                <div className="flex items-start gap-2 mb-3">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-1.5 shrink-0"></div>
                     <p className="text-[10px] font-bold text-[#434738] leading-tight italic">"{item.matchReason}"</p>
                 </div>
-                <h3 className="text-lg font-bold serif mb-1">{item.name}</h3>
+                <h3 className="text-lg font-bold serif mb-1 group-hover:underline decoration-1 underline-offset-4">{item.name}</h3>
                 <p className="text-[11px] text-[#7c766d] line-clamp-2">{item.description}</p>
             </div>
-        </div>
+        </a>
     );
 };
 
@@ -31,6 +52,7 @@ export default function Page() {
     const [thinking, setThinking] = useState<string>('');
     const [isSearching, setIsSearching] = useState(false);
     const [showThinking, setShowThinking] = useState(true);
+    const [copied, setCopied] = useState(false);
     const [query, setQuery] = useState('');
 
     const handleSearch = async () => {
@@ -46,6 +68,12 @@ export default function Page() {
             setThinking(res.thinkingProcess || '');
         } catch (e) { console.error(e); }
         setIsSearching(false);
+    };
+
+    const copyThinking = () => {
+        navigator.clipboard.writeText(thinking);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     return (
@@ -71,7 +99,7 @@ export default function Page() {
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
                         <button 
-                            className="bg-[#434738] text-white px-8 py-4 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2"
+                            className="bg-[#434738] text-white px-8 py-4 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-[#2c3024] transition-colors"
                             onClick={handleSearch}
                             disabled={isSearching}
                         >
@@ -83,16 +111,27 @@ export default function Page() {
                 {/* Gemini 3 Reasoning Block */}
                 {(isSearching || thinking) && (
                     <div className="max-w-2xl mx-auto mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div 
-                            className="bg-[#F0EEE6] border border-[#E2DFD5] rounded-xl p-4 cursor-pointer"
-                            onClick={() => setShowThinking(!showThinking)}
-                        >
-                            <div className="flex justify-between items-center">
+                        <div className="bg-[#F0EEE6] border border-[#E2DFD5] rounded-xl p-4 relative">
+                            <div 
+                                className="flex justify-between items-center cursor-pointer"
+                                onClick={() => setShowThinking(!showThinking)}
+                            >
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#6B6658]">
                                     <Sparkles className="w-3 h-3" />
                                     {isSearching ? "Gemini 3 is reasoning..." : "AI Curator Reasoning"}
                                 </div>
-                                {showThinking ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                <div className="flex items-center gap-2">
+                                    {!isSearching && thinking && (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); copyThinking(); }}
+                                            className="p-1 hover:bg-white/50 rounded transition-colors"
+                                            title="Copy reasoning"
+                                        >
+                                            {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3 text-[#6B6658]" />}
+                                        </button>
+                                    )}
+                                    {showThinking ? <ChevronUp className="w-4 h-4 text-[#6B6658]" /> : <ChevronDown className="w-4 h-4 text-[#6B6658]" />}
+                                </div>
                             </div>
                             
                             {showThinking && (
@@ -102,7 +141,7 @@ export default function Page() {
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce"></div>
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:-.3s]"></div>
                                             <div className="w-1 h-1 bg-slate-400 rounded-full animate-bounce [animation-delay:-.5s]"></div>
-                                            Parsing catalog for stylistic matches...
+                                            Analyzing catalog metadata...
                                         </div>
                                     ) : (
                                         thinking
@@ -115,7 +154,7 @@ export default function Page() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {results.map((item, idx) => (
-                        <ItemCard key={idx} item={item} onClick={() => {}} />
+                        <ItemCard key={idx} item={item} />
                     ))}
                 </div>
             </main>
